@@ -1,0 +1,32 @@
+name: "Virophage"
+author: "YiFei Zhu"
+category: pwn
+description: |-
+  This challenge is inspired by TSJ CTF 2022's
+  ["virus" challenge](https://github.com/XxTSJxX/TSJ-CTF-2022/tree/main/Pwn/Virus).
+
+  I thought a virus could be even tinier, but I there's a catch: are viruses
+  alive or dead? What separates living organisms from lifeless objects? Can
+  viruses [infect other viruses](https://en.wikipedia.org/wiki/Virophage)?
+
+  **Note: This challenge has not been solved by the author.**
+  [Have fun!](https://xkcd.com/356/)
+
+  `$ socat file:$(tty),raw,echo=0 tcp:virophage.chal.uiuc.tf:1337`
+
+  Handout: Same as `Zapping a Setuid 1`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{windows_defender_wont_catch_this_bc238ba4}
+tags:
+  - systems
+  - extreme
+state: visible
+version: "0.1"

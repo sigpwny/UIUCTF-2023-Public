@@ -1,0 +1,19 @@
+name: Feedback Survey
+author: SIGPwny
+category: misc
+description: |-
+  Thank you for participating in UIUCTF 2023! Please fill our the feedback survey here <a href="https://forms.gle/PSCq6wuH1kNVZpMp8">https://forms.gle/PSCq6wuH1kNVZpMp8</a>
+
+value: 50
+type: standard
+tags:
+  - beginner
+# extra:
+#   initial: 500
+#   decay: 75
+#   minimum: 50
+flags:
+  - uiuctf{th4nks_4_p14ying_h0p3_y0u_h4d_fun!!!}
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

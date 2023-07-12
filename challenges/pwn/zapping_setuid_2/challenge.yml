@@ -1,0 +1,28 @@
+name: "Zapping a Setuid 2"
+author: "YiFei Zhu"
+category: pwn
+description: |-
+  Ok ok ok, but what if there was another way?
+
+  `$ socat file:$(tty),raw,echo=0 tcp:zapp-setuid-2.chal.uiuc.tf:1337`
+
+  Handout: Same as `Zapping a Setuid 1`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{is-kernel-being-overly-cautious-5ba2e5c4}
+hints:
+  - The "zapps" symlink is for accessibility. The intended solution does not
+    depend on the symlink.
+  - The additional patches to this challenge are hints.
+tags:
+  - systems
+  - extreme
+state: visible
+version: "0.1"

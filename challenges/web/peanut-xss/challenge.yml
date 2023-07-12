@@ -1,0 +1,18 @@
+name: "peanut-xss"
+author: "arxenix"
+category: web
+description: |-
+  [Nutshell](https://ncase.me/nutshell/) is pretty cool. Want to [test it out](https://peanut-xss-web.chal.uiuc.tf)?
+
+  admin bot: `nc peanut-xss-bot.chal.uiuc.tf 1337`
+
+  **Author**: arxenix
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{cr4ck1ng_0open_somE_nuTsh3lls}
+state: visible

@@ -1,0 +1,46 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: group-projection
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: TCP
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/group-projection-healthcheck:c554ed157415733279fa310502c6dbbdd86613aa812b1a4f3a64a6b918bdcb2c
+  image: us.gcr.io/dotted-forest-314903/group-projection-challenge:bb7382c19a98a095e064ec110b2e2ee09a8c81f717c869fe01a419aa2150f99e
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: group-projection
+  labels:
+    app: group-projection
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`group-projection.chal.uiuc.tf`)
+      services:
+        - name: group-projection
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: group-projection-cname
+  labels:
+    app: group-projection
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: group-projection.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

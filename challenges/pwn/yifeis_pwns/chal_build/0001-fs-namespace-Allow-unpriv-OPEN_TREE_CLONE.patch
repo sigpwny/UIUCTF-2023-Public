@@ -1,0 +1,34 @@
+From 9946c9e1e098884064df8a394a6ef992c94d21e6 Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 19 Jun 2023 21:39:32 -0700
+Subject: [PATCH] fs/namespace: Allow unpriv OPEN_TREE_CLONE
+
+OPEN_TREE_CLONE is only really useful when you could use move_mount()
+to perform a bind mount. Otherwise all you get is an fd equivalent to
+an O_PATH'ed fd that is detached, without a way to modify any
+mountpoints of the current namespace.
+
+What could possibly go wrong?
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ fs/namespace.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/fs/namespace.c b/fs/namespace.c
+index df137ba19d37..4f520f800dbc 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2527,9 +2527,6 @@ SYSCALL_DEFINE3(open_tree, int, dfd, const char __user *, filename, unsigned, fl
+ 	if (flags & AT_EMPTY_PATH)
+ 		lookup_flags |= LOOKUP_EMPTY;
+ 
+-	if (detached && !may_mount())
+-		return -EPERM;
+-
+ 	fd = get_unused_fd_flags(flags & O_CLOEXEC);
+ 	if (fd < 0)
+ 		return fd;
+-- 
+2.41.0
+

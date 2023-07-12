@@ -1,0 +1,19 @@
+name: "Join our Discord"
+author: SIGPwny
+category: misc
+description: |-
+  Join the UIUCTF Discord channel! <a href="https://discord.gg/PytGqjq">https://discord.gg/PytGqjq</a>
+
+value: 1
+type: standard
+tags:
+  - beginner
+# extra:
+#   initial: 500
+#   decay: 75
+#   minimum: 50
+flags:
+  - uiuctf{new_era_of_CTFing}
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

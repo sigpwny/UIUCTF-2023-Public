@@ -1,0 +1,26 @@
+name: "Rattler Read"
+author: "Pete Stenger"
+category: pwn
+description: |-
+  All these poisonous snakes keep biting me. Good think I remembered to bring
+  restrictedpython to keep me safe!
+
+  `$ nc rattler-read.chal.uiuc.tf 1337`
+
+  **author**: Pete Stenger
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{damn_1_8te_my_ta1l_ag41n}
+tags:
+  - jail
+  - medium
+files:
+  - handout.tar.gz
+  - challenge/main.py
+state: visible
+version: "0.1"

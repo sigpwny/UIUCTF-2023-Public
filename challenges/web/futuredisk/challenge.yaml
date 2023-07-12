@@ -1,0 +1,62 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: futuredisk
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: TCP
+        targetPort: 1337
+  podTemplate:
+    template:
+      spec:
+        containers:
+          - name: challenge
+            securityContext:
+              privileged: true
+            volumeMounts:
+              - name: fuse-host
+                mountPath: /dev/fuse
+        volumes:
+          - name: fuse-host
+            hostPath:
+              path: /dev/fuse
+              type: CharDevice
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/futuredisk-healthcheck:657fd32a9295671f39e2a91387b18d9892715c4bba414eae35f6e607975555ef
+  image: us.gcr.io/dotted-forest-314903/futuredisk-challenge:8b1f2898383c456a3d5c31202eea7eb1844d6835d2f51e7fbd44527292d782a9
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: futuredisk
+  labels:
+    app: futuredisk
+spec:
+  entryPoints:
+    - https
+  routes:
+    - match: Host(`futuredisk-web.chal.uiuc.tf`)
+      kind: Rule
+      services:
+        - name: futuredisk
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: futuredisk-cname
+  labels:
+    app: futuredisk
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: futuredisk-web.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

@@ -1,0 +1,9 @@
+.*.sw*
+.DS_Store
+__pycache__/
+**/venv
+
+kctf/bin/kind
+kctf/bin/kubectl
+kctf/bin/yq
+kctf/config/.lastconfig

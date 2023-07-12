@@ -1,0 +1,9 @@
+{
+  "name": "flag",
+  "value": "uiuctf{cr4ck1ng_0open_somE_nuTsh3lls}",
+  "domain": "DOMAIN_SET_IN_DOCKERFILE",
+  "url": "https://DOMAIN_SET_IN_DOCKERFILE/",
+  "path": "/",
+  "httpOnly": false,
+  "secure": true
+}

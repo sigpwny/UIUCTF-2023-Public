@@ -1,0 +1,29 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: geoguesser
+author: richard
+category: rev
+description: |-
+  I thought geoguesser was too easy, so I made it harder.
+
+  Usage: `janet -i program.jimage`
+
+  `nc geoguesser.chal.uiuc.tf 1337`
+
+  **Author**: richard
+value: 500
+type: dynamic
+tags:
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{i_se3_y0uv3_f0und_7h3_t1m3_t0_r3v_th15_b333b674c1365966}
+files:
+  - challenge/janet
+  - challenge/program.jimage
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

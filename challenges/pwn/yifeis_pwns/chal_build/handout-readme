@@ -1,0 +1,13 @@
+This directory contains:
+
+- chal_build: The files used to build the challenges.
+- run: Pre-built files in case you want to run the challenges locally. This is
+  the same copy of the challenge files running on the server.
+
+These challenges might be very difficult to debug, so I'm providing a root
+shell. To play around with an unprivileged user, you can use the same setpriv
+command as the remote host.
+
+I also bundled gcc per popular request from last year. Apologies for the
+size of the handle bundle. Since most of the overhead (gdb and gcc) are shared
+between these challenes, I'm making it into a single bundle.

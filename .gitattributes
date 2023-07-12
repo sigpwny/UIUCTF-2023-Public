@@ -1,0 +1,6 @@
+.gitattributes !filter !diff
+*.secret.yaml filter=git-crypt diff=git-crypt
+/.ctf/config filter=git-crypt diff=git-crypt
+/ctfd/ctfd/*-deploy-key filter=git-crypt diff=git-crypt
+/instancer/hostproxy-cert/*.pem filter=git-crypt diff=git-crypt
+/challenges/pwn/mock/bastion/ssh_host_*_key filter=git-crypt diff=git-crypt

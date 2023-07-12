@@ -1,0 +1,53 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: peanut-xss-bot
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: TCP
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/peanut-xss-bot-healthcheck:4dc39914b072a549b28a835bc5dd4bacdf44d8dee64856ea1e9ced3c9980f886
+  # You can allow the bot to connect to other challenges internally.
+  # This can be useful during testing so that you don't have to make your
+  # challenge public.
+  # The challenge will be reachable at $name.default.svc.cluster.local or
+  # simply at $name with the default k8s search list.
+  allowConnectTo:
+    - peanut-xss
+  image: us.gcr.io/dotted-forest-314903/peanut-xss-bot-challenge:09ad7b9ce007883c4dd440e4aa7daed278b26dfac48e1dbb365448c259623fcc
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: peanut-xss-bot
+  labels:
+    app: peanut-xss-bot
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`peanut-xss-bot.chal.uiuc.tf`)
+      services:
+        - name: peanut-xss-bot
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peanut-xss-bot-cname
+  labels:
+    app: peanut-xss-bot
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: peanut-xss-bot.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

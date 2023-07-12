@@ -1,0 +1,16 @@
+#!/bin/busybox ash
+# Copyright 2021-2023 Google LLC.
+# SPDX-License-Identifier: MIT
+
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+set -x
+
+mount -n -t proc -o nosuid,noexec,nodev proc /proc/
+
+mkdir -p /dev /sys /etc
+
+mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+mount -n -t sysfs -o nosuid,noexec,nodev sys /sys
+
+cd /root && exec setsid cttyhack ash -l 0<>"/dev/ttyS0" 1>&0 2>&0

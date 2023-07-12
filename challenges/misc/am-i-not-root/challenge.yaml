@@ -1,0 +1,68 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: am-i-not-root
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  podTemplate:
+    template:
+      spec:
+        containers:
+          - name: challenge
+            securityContext:
+              privileged: true
+            volumeMounts:
+              - name: kvm-host
+                mountPath: /dev/kvm
+        volumes:
+          - name: kvm-host
+            hostPath:
+              path: /dev/kvm
+              type: CharDevice
+        nodeSelector:
+          dedicated: kvm
+        tolerations:
+          - key: dedicated
+            operator: Equal
+            value: kvm
+            effect: NoExecute
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/am-i-not-root-healthcheck:bbf0f087b258de4174f6ab456f4af941301bf28f4407d6096341e7f167152da2
+  image: us.gcr.io/dotted-forest-314903/am-i-not-root-challenge:7496436e5707d82046c0a023586abde09b5106de9121873ae1a3dfd7344e528c
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: am-i-not-root
+  labels:
+    app: am-i-not-root
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`am-i-not-root.chal.uiuc.tf`)
+      services:
+        - name: am-i-not-root
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: am-i-not-root-cname
+  labels:
+    app: am-i-not-root
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: am-i-not-root.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

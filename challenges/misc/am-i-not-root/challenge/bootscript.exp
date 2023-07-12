@@ -1,0 +1,16 @@
+#! /usr/bin/expect -f
+
+set timeout -1
+set stty_init -isig
+
+spawn -noecho /home/user/run.sh
+
+expect "uiuctf-2023:/home/user# "
+send "./init_chal am-i-not-root\n"
+
+expect "uiuctf-2023:/home/user# "
+send "exec ./am-i-not-root\n"
+
+expect "Entering jail..."
+expect "uiuctf-2023:/home/user# "
+interact

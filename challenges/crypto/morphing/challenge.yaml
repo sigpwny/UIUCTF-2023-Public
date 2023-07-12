@@ -1,0 +1,46 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: morphing
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: TCP
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/morphing-healthcheck:b9331258c848f1dc2a0843c85e83e53919378579af00d2a0c1a4bf74bdf6b7cf
+  image: us.gcr.io/dotted-forest-314903/morphing-challenge:91a9e8f0b74b91d20ff3b00e58900e41f34a1164ba170ca456574d713eb8b2db
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: morphing
+  labels:
+    app: morphing
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`morphing.chal.uiuc.tf`)
+      services:
+        - name: morphing
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: morphing-cname
+  labels:
+    app: morphing
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: morphing.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

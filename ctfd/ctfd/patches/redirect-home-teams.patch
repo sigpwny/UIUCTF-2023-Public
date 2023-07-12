@@ -1,0 +1,31 @@
+diff --git a/CTFd/teams.py b/CTFd/teams.py
+index 1e6fcfb0..d7091634 100644
+--- a/CTFd/teams.py
++++ b/CTFd/teams.py
+@@ -117,7 +117,7 @@ def invite():
+         clear_user_session(user_id=user.id)
+         clear_team_session(team_id=team.id)
+ 
+-        return redirect(url_for("challenges.listing"))
++        return redirect("/")
+ 
+ 
+ @teams.route("/teams/join", methods=["GET", "POST"])
+@@ -178,7 +178,7 @@ def join():
+             clear_user_session(user_id=user.id)
+             clear_team_session(team_id=team.id)
+ 
+-            return redirect(url_for("challenges.listing"))
++            return redirect("/")
+         else:
+             errors.append("That information is incorrect")
+             return render_template("teams/join_team.html", infos=infos, errors=errors)
+@@ -306,7 +306,7 @@ def new():
+         clear_user_session(user_id=user.id)
+         clear_team_session(team_id=team.id)
+ 
+-        return redirect(url_for("challenges.listing"))
++        return redirect("/")
+ 
+ 
+ @teams.route("/team")

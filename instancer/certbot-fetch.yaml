@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: instancer-certbot-fetch-CHALLENGE_NAME
+  namespace: kctf-system
+  labels:
+    app: instancer-certbot-fetch
+    chal: CHALLENGE_NAME
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: instancer-certbot-fetch
+        chal: CHALLENGE_NAME
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: sleep
+          image: busybox
+          command:
+            - sleep
+            - infinity
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - mountPath: /export/
+              name: certs
+      volumes:
+        - name: certs
+          persistentVolumeClaim:
+           claimName: instancer-certbot-CHALLENGE_NAME-pvc
+      restartPolicy: Never
+  ttlSecondsAfterFinished: 0

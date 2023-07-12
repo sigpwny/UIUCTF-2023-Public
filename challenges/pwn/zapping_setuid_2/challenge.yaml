@@ -1,0 +1,68 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: zapp-setuid-2
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  podTemplate:
+    template:
+      spec:
+        containers:
+          - name: challenge
+            securityContext:
+              privileged: true
+            volumeMounts:
+              - name: kvm-host
+                mountPath: /dev/kvm
+        volumes:
+          - name: kvm-host
+            hostPath:
+              path: /dev/kvm
+              type: CharDevice
+        nodeSelector:
+          dedicated: kvm
+        tolerations:
+          - key: dedicated
+            operator: Equal
+            value: kvm
+            effect: NoExecute
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/zapp-setuid-2-healthcheck:bf03904bbdb0e3479b16d93c86e256c401fbdf5dcc7f702775d24bace75ef0ee
+  image: us.gcr.io/dotted-forest-314903/zapp-setuid-2-challenge:238deb0cd5ecf762d45507f9ae527bea0c19dfaf38c84c1a8c35ea0f47e1aa3b
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: zapp-setuid-2
+  labels:
+    app: zapp-setuid-2
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`zapp-setuid-2.chal.uiuc.tf`)
+      services:
+        - name: zapp-setuid-2
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zapp-setuid-2-cname
+  labels:
+    app: zapp-setuid-2
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: zapp-setuid-2.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

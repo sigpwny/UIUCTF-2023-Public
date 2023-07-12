@@ -1,0 +1,39 @@
+name: MANUAL - CTFd sync
+# Controls when the action will run. 
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v2 # Checks-out repository under $GITHUB_WORKSPACE, so job can access it
+      - uses: actions/setup-python@v2 # install python
+      - name: Install ctfcli
+        run: |
+          python -m pip install --upgrade pip
+          pip install ctfcli
+      - name: decrypt credentials
+        run: |
+          sudo apt-get install -y git-crypt
+          git-crypt unlock git-crypt-key
+      - name: sync chals to ctfd
+        run: |
+          shopt -s globstar
+          cd $GITHUB_WORKSPACE/challenges
+          for i in ./**/challenge.yml; do 
+            CHAL_DIR=$(dirname $i)
+            echo "SYNCING CHAL TO CTFd: $CHAL_DIR"
+            # try installing first, if already exists, sync will update it
+            ctf challenge install $CHAL_DIR
+            ctf challenge sync $CHAL_DIR
+            if [ $? == 1 ]; then
+              echo "::warning::Error syncing chal $CHAL_DIR"
+            fi
+            ctf challenge install $CHAL_DIR
+          done
+        shell: bash --noprofile --norc {0}

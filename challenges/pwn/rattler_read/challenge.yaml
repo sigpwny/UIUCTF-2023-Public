@@ -1,0 +1,47 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: rattler-read
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/rattler-read-healthcheck:b3af080afabcfcb37cc71c338b66ee0ce8e9372a4aa1be69bc5e111781d80b93
+  image: us.gcr.io/dotted-forest-314903/rattler-read-challenge:2a8adc1caa203f4f74c3b717c8ad5f26bcdaa908a327ceadb73e5ef542687bdb
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: rattler-read
+  labels:
+    app: rattler-read
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`rattler-read.chal.uiuc.tf`)
+      services:
+        - name: rattler-read
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rattler-read-cname
+  labels:
+    app: rattler-read
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: rattler-read.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

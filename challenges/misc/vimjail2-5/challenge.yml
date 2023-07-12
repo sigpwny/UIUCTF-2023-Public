@@ -1,0 +1,31 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: vimjail2.5
+author: richard
+category: misc
+description: |-
+  Fixed unintended solve in vimjail2
+
+  Connect with `socat file:$(tty),raw,echo=0 tcp:vimjail2-5.chal.uiuc.tf:1337`. You may need to install socat.
+
+  **Author**: richard
+value: 500
+type: dynamic
+tags:
+  - medium
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{1_kn0w_h0w_7o_ex1t_v1m_7661892ec70e3550}
+files:
+  - challenge/Dockerfile
+  - challenge/entry.sh
+  - challenge/nsjail.cfg
+  - challenge/vimrc
+  - challenge/viminfo
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

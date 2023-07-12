@@ -1,0 +1,102 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: CHALLENGE_NAME-instancer
+  labels:
+    app: CHALLENGE_NAME-instancer
+spec:
+  entryPoints:
+    - https
+  routes:
+  - match: Host(`CHALLENGE_NAME.chal.uiuc.tf`)
+    kind: Rule
+    services:
+    - name: instancer
+      port: 1337
+  tls:
+    secretName: tls-cert-instancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: CHALLENGE_NAME-instancer-cname
+  labels:
+    app: CHALLENGE_NAME-instancer-cname
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: CHALLENGE_NAME.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: CHALLENGE_NAME-hostproxy
+  labels:
+    app: CHALLENGE_NAME-hostproxy
+spec:
+  entryPoints:
+    - https
+  routes:
+  - match: HostRegexp(`{instance:[^.]+}.CHALLENGE_NAME.chal.uiuc.tf`)
+    kind: Rule
+    services:
+    - name: hostproxy
+      port: 80
+  tls:
+    secretName: tls-cert-CHALLENGE_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: CHALLENGE_NAME-hostproxy-cname
+  labels:
+    app: CHALLENGE_NAME-hostproxy-cname
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "*.CHALLENGE_NAME.chal.uiuc.tf"
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: CHALLENGE_NAME-managed
+  labels:
+    name: CHALLENGE_NAME-managed
+    uiuctf-namespace: instancer-managed
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: CHALLENGE_NAME-manager-role
+  namespace: CHALLENGE_NAME-managed
+rules:
+  - apiGroups: ["*"]
+    resources:
+      - jobs
+      - pods
+      - services
+      - ingresses
+    verbs:
+      - create
+      - update
+      - patch
+      - delete
+      - get
+      - watch
+      - list
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: CHALLENGE_NAME-manager
+  namespace: CHALLENGE_NAME-managed
+subjects:
+  - kind: ServiceAccount
+    name: instancer-manager
+    namespace: default
+roleRef:
+  kind: Role
+  name: CHALLENGE_NAME-manager-role
+  apiGroup: rbac.authorization.k8s.io

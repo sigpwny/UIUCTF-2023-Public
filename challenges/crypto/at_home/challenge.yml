@@ -1,0 +1,30 @@
+name: "At Home"
+author: "Anakin"
+category: crypto
+description: |-
+  Mom said we had food at home
+
+  **Author**: Anakin
+value: 100
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+
+healthcheck: healthcheck/healthcheck.py
+
+flags:
+    - uiuctf{W3_hav3_R5A_@_h0m3}
+
+tags:
+    - crypto
+    - beginner
+
+# Provide paths to files from the same directory that this file is in
+# Accepts strings
+files:
+    - challenge/chal.py
+    - challenge/chal.txt
+
+state: visible

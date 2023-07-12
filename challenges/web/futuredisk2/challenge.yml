@@ -1,0 +1,17 @@
+name: "futuredisk2"
+author: "kuilin"
+category: web
+description: |-
+  Like futuredisk, but a little worse.
+
+  https://futuredisk2-web.chal.uiuc.tf/haystack2.bin.gz
+
+  **Author**: kuilin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{i sincerely hope that was not too contrived, deflate streams are cool}

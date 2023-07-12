@@ -1,0 +1,25 @@
+name: vmwhere2
+author: richard
+category: rev
+description: |-
+  Usage: `./chal program`
+
+  The sha256 hash of the flag is `4c17f2be4c4d2759c4195f075019331fa3bd68a03f1dd04c10023cbc134d82ae` (to check your flag, run `echo -n "uiuctf{...}" | sha256sum`
+
+  **Author**: richard
+value: 500
+type: dynamic
+tags:
+  - beginner
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{b4s3_3_1s_b4s3d_just_l1k3_vm_r3v3rs1ng}
+files:
+  - challenge/chal
+  - challenge/program
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

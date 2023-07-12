@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: INSTANCE_NAME
+  namespace: adminplz-managed
+  labels:
+    name: INSTANCE_NAME
+spec:
+  activeDeadlineSeconds: 2700
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: adminplz
+        name: INSTANCE_NAME
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: challenge
+          image: us.gcr.io/dotted-forest-314903/adminplz-challenge:e0c009ac81770d56c4c9ae4737dbd0763f770b90c2015a8efed962ff7e127fe5
+          ports:
+            - containerPort: 8080
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: var-log
+              mountPath: /var/log
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Mi
+        - name: var-log
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Mi
+      restartPolicy: Never
+  ttlSecondsAfterFinished: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: INSTANCE_NAME
+  namespace: adminplz-managed
+  labels:
+    name: INSTANCE_NAME
+  ownerReferences: null
+spec:
+  selector:
+    app: adminplz
+    name: INSTANCE_NAME
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

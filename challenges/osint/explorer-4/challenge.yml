@@ -1,0 +1,19 @@
+name: "Jonah's Journal"
+author: "David"
+category: osint
+description: "After dinner, Jonah took notes into an online notebook and pushed his changes there. His usernames have been relatively consistent but what country is he going to next? Flag should be in format uiuctf{country_name}"
+type: dynamic
+value: 500
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{italy}
+  - uiuctf{Italy}
+tags:
+  - osint
+  - worldwide
+hints:
+ - forks, trees, pushing, and pulling
+state: visible

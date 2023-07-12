@@ -1,0 +1,34 @@
+From 7d26a340113813b6f9064b25f2928c177269d2f5 Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 19 Jun 2023 22:26:16 -0700
+Subject: [PATCH] fs/namespace: Allow generic loopback mount without requiring
+ nsfs
+
+The argument was flawed and was never agreed upon [1].
+
+After 18 years, what could possibly go wrong?
+
+[1] https://lore.kernel.org/all/1131563299.5400.392.camel@localhost/T/#t
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ fs/namespace.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/fs/namespace.c b/fs/namespace.c
+index 4f520f800dbc..eb196f016e3f 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2396,9 +2396,6 @@ static struct mount *__do_loopback(struct path *old_path, int recurse)
+ 	if (IS_MNT_UNBINDABLE(old))
+ 		return mnt;
+ 
+-	if (!check_mnt(old) && old_path->dentry->d_op != &ns_dentry_operations)
+-		return mnt;
+-
+ 	if (!recurse && has_locked_children(old, old_path->dentry))
+ 		return mnt;
+ 
+-- 
+2.41.0
+

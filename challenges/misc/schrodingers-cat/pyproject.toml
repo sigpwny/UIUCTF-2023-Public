@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "schrodinger's cat"
+version = "0.1.0"
+description = "did you do it? yes. what did it cost? all of my disk space."
+authors = ["Shorden"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = ">=1.24.0"
+qiskit = {version = ">=0.40.0", extras = ["visualization"]}
+
+[tool.poetry.group.dev.dependencies]
+pillow = "^10.0.0"
+pylatexenc = "^2.10"
+matplotlib = "^3.7.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

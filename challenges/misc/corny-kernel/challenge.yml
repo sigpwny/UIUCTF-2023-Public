@@ -1,0 +1,29 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: Corny Kernel
+author: Nitya
+category: misc
+description: |-
+  Use our corny little driver to mess with the Linux kernel at runtime!
+
+  `$ socat file:$(tty),raw,echo=0 tcp:corny-kernel.chal.uiuc.tf:1337`
+
+  **author**: Nitya
+value: 500
+type: dynamic
+tags:
+  - misc
+  - systems
+  - beginner
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{m4ster_k3rNE1_haCk3r}
+files:
+  - challenge/pwnymodule.c
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

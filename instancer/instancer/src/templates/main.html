@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html class="h-100" xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en">
+<head>
+  <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+  <title>{{ title }} Instancer</title>
+  <script src="https://www.google.com/recaptcha/api.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+</head>
+<body class="d-flex h-100 text-center text-white bg-dark">
+  <div style="max-width: 42em;" class="d-flex w-100 h-100 p-3 mx-auto flex-column">
+    <main class="px-3">
+      <h1>{{ title }} Instancer</h1>
+      {% if error %}
+      <div class="alert alert-danger" role="alert">
+        {{error}}
+      </div>
+      {% endif %}
+      <p class="lead">
+        When you press the button below, you will be redirected to your own
+        reserved instance of the challenge with a lifetime of 15 minutes.
+      </p>
+      <p class="lead">
+        You're highly recommended to test out your exploit locally by running
+        the provided handout, before exploiting this remote instance.
+      </p>
+      <p class="lead">
+        It should take a few seconds for the instance to start up.
+      </p>
+      <form id="spawn" method="post" action="/">
+        <div style="display: inline-block;" class="g-recaptcha" data-sitekey="6LeqscMgAAAAAPvScCoQvr3GNKSXeaWNQNKmdtnO"></div>
+        <br/>
+        <input class="btn btn-primary" type="submit" value="Spawn Instance">
+      </form>
+    </main>
+  </div>
+</body>
+</html>

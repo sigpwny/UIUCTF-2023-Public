@@ -1,0 +1,30 @@
+name: "Tornado Warning"
+author: "Pomona"
+category: misc
+description: |-
+ "Check out this alert that I received on a weather radio. Somebody transmitted a secret message via errors in the header! Fortunately, my radio corrected the errors and recovered the original data. But can you find out what the secret message says?\n\nNote: flag is not case sensitive."
+
+ **Author**: Pomona
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - {
+      type: "static",
+      content: "uiuctf{3rd_w0rst_tor_outbre@k_ev3r}",
+      data: "case_insensitive",
+  }
+tags:
+  - misc
+  - extreme
+  - radio
+files:
+  - warning.wav
+hints:
+  - The header is encoded with Specific Area Message Encoding.
+  - The three buzzes are supposed to be identical, but in this challenge, they are different due to errors.
+state: visible
+version: "0.1"

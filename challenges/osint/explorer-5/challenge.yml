@@ -1,0 +1,20 @@
+name: "First class mail"
+author: "David"
+category: osint
+description: "Jonah posted a picture online with random things on a table. Can you find out what zip code he is located in? Flag format should be uiuctf{zipcode}, ex: uiuctf{12345}."
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{60661}
+files:
+  - chal.jpg
+tags:
+  - osint
+  - zip-code
+hints:
+  - I think code is cool
+state: visible

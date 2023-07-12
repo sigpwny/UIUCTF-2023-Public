@@ -1,0 +1,24 @@
+name: "Schrodinger's Cat"
+author: George 
+category: misc
+description: |-
+  Our boss got mad that our SSH keys were weak, so now we're using a quantum computer to be extra secure!
+  
+  `nc schrodingers-cat.chal.uiuc.tf 1337`
+
+  **author**: George
+hints:
+  - There are known bugs in OpenQASM transpilation — please use Qiskit, and optimize your circuit before serialization.
+  - Shendefraude? Bullocks I say! You're way off the Markov.
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+state: visible
+flags:
+  - uiuctf{f3yn_m4n_h3r32_j00r_fL49}
+files:
+  - challenge/requirements.txt
+  - challenge/server.py

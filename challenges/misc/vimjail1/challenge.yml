@@ -1,0 +1,28 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: vimjail1
+author: richard
+category: misc
+description: |-
+  Connect with `socat file:$(tty),raw,echo=0 tcp:vimjail1.chal.uiuc.tf:1337`. You may need to install socat.
+
+  **Author**: richard
+value: 500
+type: dynamic
+tags:
+  - medium
+extra:
+  initial: 500
+  decay: 65
+  minimum: 50
+flags:
+  - uiuctf{n0_3sc4p3_f0r_y0u_8613a322d0eb0628}
+files:
+  - challenge/Dockerfile
+  - challenge/entry.sh
+  - challenge/nsjail.cfg
+  - challenge/vimrc
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

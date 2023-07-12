@@ -1,0 +1,18 @@
+name: "Finding Artifacts 2"
+author: "David"
+category: osint
+description: "New York City is known for its sprawling subway system. However, none of that would have been possible without modern earth-moving equipment. Find where the first ever shovel was used to start digging the subway. Flag format should be in uiuctf{name_of_museum}"
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{museum_of_the_city_of_new_york}
+tags:
+  - osint
+  - museum
+hints:
+ - well known for their baby blue colorings
+state: visible

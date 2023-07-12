@@ -1,0 +1,18 @@
+name: "What's for Dinner?"
+author: "David"
+category: osint
+description: "Jonah Explorer, world renowned, recently landed in the city of Chicago, so you fly there to try and catch him. He was spotted at a joyful Italian restaurant in West Loop. You miss him narrowly but find out that he uses a well known social network and and loves documenting his travels and reviewing his food. Find his online profile."
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{i_like_spaghetti}
+tags:
+  - osint
+  - food
+hints:
+ - what does joy translate to?
+state: visible

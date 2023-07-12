@@ -1,0 +1,30 @@
+From 7bba6f2216c5b757e38cd90f7b12bdf952e316c7 Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 19 Jun 2023 23:04:25 -0700
+Subject: [PATCH] fs/namespace: Check userns instead of mntns in mnt_may_suid
+
+If we are in the same userns, I don't see why we need to check
+if we are in the same mntns too, right?
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ fs/namespace.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/fs/namespace.c b/fs/namespace.c
+index eb196f016e3f..25757327a82a 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -4609,7 +4609,8 @@ bool mnt_may_suid(struct vfsmount *mnt)
+ 	 * suid/sgid bits, file caps, or security labels that originate
+ 	 * in other namespaces.
+ 	 */
+-	return !(mnt->mnt_flags & MNT_NOSUID) && check_mnt(real_mount(mnt)) &&
++	return !(mnt->mnt_flags & MNT_NOSUID) &&
++	       current_in_userns(real_mount(mnt)->mnt_ns->user_ns) &&
+ 	       current_in_userns(mnt->mnt_sb->s_user_ns);
+ }
+ 
+-- 
+2.41.0
+

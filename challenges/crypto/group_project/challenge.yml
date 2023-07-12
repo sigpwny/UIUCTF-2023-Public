@@ -1,0 +1,58 @@
+name: "Group Project"
+author: "Anakin"
+category: crypto
+description: |-
+  In any good project, you split the work into smaller tasks...
+
+  `nc group.chal.uiuc.tf 1337`
+
+  **Author**: Anakin
+value: 100
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+
+# Settings used for Dockerfile deployment
+# If not used, remove or set to null
+# If you have a Dockerfile set to .
+# If you have an imaged hosted on Docker set to the image url (e.g. python/3.8:latest, registry.gitlab.com/python/3.8:latest)
+# Follow Docker best practices and assign a tag
+image: null
+
+# Specify a protocol that should be used to connect to the running image
+# For example if the image is a website you can specify http or https
+# Otherwise you can specify tcp
+protocol: null
+
+# Specify a host to deploy the challenge onto.
+# The currently supported URI schemes are ssh:// and registry://
+# ssh is an ssh URI where the above image will be copied to and deployed (e.g. ssh://root@123.123.123.123)
+# registry is a Docker registry tag (e.g registry://registry.example.com/test/image)
+# host can also be specified during the deploy process: `ctf challenge deploy challenge --host=ssh://root@123.123.123.123`
+host: null
+
+# Optional settings
+
+# connection_info is used to provide a link, hostname, or instructions on how to connect to a challenge
+connection_info: nc hostname 12345
+
+# healthcheck is a tool/script used to check a challenge
+# If connection_info was provided to CTFd when the challenge was installed, it will be passed to the healthcheck script:
+# ./writeup/exploit.sh --connection-info "nc hostname 12345"
+healthcheck: healthcheck/healthcheck.py
+
+flags:
+    - uiuctf{brut3f0rc3_a1n't_s0_b4d_aft3r_all!!11!!}
+
+
+tags:
+    - crypto
+
+# Provide paths to files from the same directory that this file is in
+# Accepts strings
+files:
+    - challenge/chal.py
+
+state: visible

@@ -1,0 +1,25 @@
+#!/bin/bash
+# Copyright 2021-2023 Google LLC.
+# SPDX-License-Identifier: MIT
+
+set -x
+
+case "$1" in
+  virophage)
+    rm -r /usr/lib/zapps am-i-not-root{,.c}
+    ;;
+  zapp-setuid-1)
+    rm -r virophage{,.c} am-i-not-root{,.c}
+    ln -s /usr/lib/zapps zapps
+    sysctl -w fs.protected_hardlinks=0
+    ;;
+  zapp-setuid-2)
+    rm -r virophage{,.c} am-i-not-root{,.c}
+    ln -s /usr/lib/zapps zapps
+    sysctl -w fs.protected_hardlinks=1
+    ;;
+  am-i-not-root)
+    rm -r virophage{,.c} /usr/lib/zapps
+    chown root:root /home/user
+    ;;
+esac

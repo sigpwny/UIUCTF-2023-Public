@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: chal-files-mock-pv
+  namespace: mock-managed
+spec:
+  accessModes:
+    - ReadOnlyMany
+  capacity:
+    storage: 15Gi
+  storageClassName: standard
+  claimRef:
+    namespace: mock-managed
+    name: chal-files-mock-pvc
+  mountOptions:
+    - implicit-dirs
+    - uid=0
+    - gid=0
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    volumeHandle: chal-files-2023-mock
+    readOnly: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chal-files-mock-pvc
+  namespace: mock-managed
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 15Gi
+  volumeName: chal-files-mock-pv
+  storageClassName: standard
+---
+# gcloud iam service-accounts create uiuctf-2023-chal-gcs-sa
+# gcloud storage buckets add-iam-policy-binding gs://chal-files-2023-mock \
+#   --member "serviceAccount:uiuctf-2023-chal-gcs-sa@dotted-forest-314903.iam.gserviceaccount.com" \
+#   --role "roles/storage.insightsCollectorService"
+# gcloud storage buckets add-iam-policy-binding gs://chal-files-2023-mock \
+#   --member "serviceAccount:uiuctf-2023-chal-gcs-sa@dotted-forest-314903.iam.gserviceaccount.com" \
+#   --role "roles/storage.objectViewer"
+# gcloud iam service-accounts add-iam-policy-binding \
+#   "uiuctf-2023-chal-gcs-sa@dotted-forest-314903.iam.gserviceaccount.com" \
+#   --role roles/iam.workloadIdentityUser \
+#   --member "serviceAccount:dotted-forest-314903.svc.id.goog[mock-managed/gcs-chal-files-sa]"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    iam.gke.io/gcp-service-account: uiuctf-2023-chal-gcs-sa@dotted-forest-314903.iam.gserviceaccount.com
+  name: gcs-chal-files-sa
+  namespace: mock-managed
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-bastion
+  namespace: default
+  labels:
+    app: mock-bastion
+spec:
+  selector:
+    matchLabels:
+      app: mock-bastion
+  template:
+    metadata:
+      labels:
+        app: mock-bastion
+        uiuctf-egress: instancer-managed
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: bastion
+          image: us.gcr.io/dotted-forest-314903/mock-bastion:6042a9dcd4371da1fc020f98d6b045ad21e4a6a1166701880dcdc5fc89d59ad1
+          ports:
+            - containerPort: 22
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+      dnsConfig:
+        searches:
+          - mock-managed.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-bastion
+  namespace: default
+  labels:
+    app: mock-bastion
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: mock-bastion.chal.uiuc.tf
+spec:
+  selector:
+    app: mock-bastion
+  ports:
+    - protocol: TCP
+      port: 1337
+      targetPort: 22
+  type: LoadBalancer
+  externalTrafficPolicy: Local

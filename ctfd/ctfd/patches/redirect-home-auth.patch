@@ -1,0 +1,22 @@
+diff --git a/CTFd/auth.py b/CTFd/auth.py
+index 739558ea..fc641ac6 100644
+--- a/CTFd/auth.py
++++ b/CTFd/auth.py
+@@ -33,7 +33,7 @@ auth = Blueprint("auth", __name__)
+ def confirm(data=None):
+     if not get_config("verify_emails"):
+         # If the CTF doesn't care about confirming email addresses then redierct to challenges
+-        return redirect(url_for("challenges.listing"))
++        return redirect("/")
+ 
+     # User is confirming email account
+     if data and request.method == "GET":
+@@ -63,7 +63,7 @@ def confirm(data=None):
+         email.successful_registration_notification(user.email)
+         db.session.close()
+         if current_user.authed():
+-            return redirect(url_for("challenges.listing"))
++            return redirect("/")
+         return redirect(url_for("auth.login"))
+ 
+     # User is trying to start or restart the confirmation flow

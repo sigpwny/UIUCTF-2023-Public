@@ -1,0 +1,172 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: uiuctf-egress-k8s-api
+spec:
+  podSelector:
+    matchLabels:
+      uiuctf-egress: k8s-api
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.34/32
+      ports:
+        - protocol: TCP
+          port: 443
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: uiuctf-egress-instancer-managed
+spec:
+  podSelector:
+    matchLabels:
+      uiuctf-egress: instancer-managed
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              uiuctf-namespace: instancer-managed
+  policyTypes:
+    - Egress
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: instancer-manager
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: instancer-manager-clusterroles
+rules:
+  - apiGroups: ["*"]
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: instancer-manager
+subjects:
+  - kind: ServiceAccount
+    name: instancer-manager
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: instancer-manager-clusterroles
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: instancer
+  namespace: default
+  labels:
+    app: instancer
+spec:
+  selector:
+    matchLabels:
+      app: instancer
+  template:
+    metadata:
+      labels:
+        app: instancer
+        uiuctf-egress: k8s-api
+    spec:
+      containers:
+        - name: instancer
+          image: us.gcr.io/dotted-forest-314903/instancer-instancer:81c8f88bc9a225348231660e37e5e79846da1d208e3fe8e3b19aa64479f76882
+          ports:
+            - containerPort: 1337
+          envFrom:
+            - secretRef:
+                name: instancer-secrets
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: instance-templates-volume
+              mountPath: /etc/instance-templates
+      serviceAccountName: instancer-manager
+      volumes:
+        - name: instance-templates-volume
+          configMap:
+            name: instance-templates
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: instancer
+  namespace: default
+  labels:
+    app: instancer
+spec:
+  selector:
+    app: instancer
+  ports:
+    - protocol: TCP
+      port: 1337
+      targetPort: 1337
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hostproxy
+  namespace: default
+  labels:
+    app: hostproxy
+spec:
+  selector:
+    matchLabels:
+      app: hostproxy
+  template:
+    metadata:
+      labels:
+        app: hostproxy
+        uiuctf-egress: instancer-managed
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: hostproxy
+          image: us.gcr.io/dotted-forest-314903/instancer-hostproxy:714f52aac3a877ad83177953bcb2f04f23ffc002c98fcdb719b9a941c8e3e691
+          ports:
+            - containerPort: 80
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: hostproxy
+spec:
+  timeoutSec: 900
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostproxy
+  namespace: default
+  annotations:
+    cloud.google.com/backend-config: '{"default": "hostproxy"}'
+  labels:
+    app: hostproxy
+spec:
+  selector:
+    app: hostproxy
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort

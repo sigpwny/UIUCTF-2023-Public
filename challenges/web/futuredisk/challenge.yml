@@ -1,0 +1,24 @@
+name: "futuredisk"
+author: "kuilin"
+category: web
+description: |-
+  I'm from the year 2123. Here's what I did:
+  * Mounted my 10 exabyte flash drive
+  * fallocate -l 8E haystack.bin
+  * dd if=flag.txt bs=1 seek=[REDACTED] conv=notrunc of=haystack.bin
+  * gzip haystack.bin
+  * Put haystack.bin.gz on my web server for you to download
+
+  HTTP over Time Travel is a bit slow, so I hope gzipping it made it a little faster to download :)
+
+  https://futuredisk-web.chal.uiuc.tf/haystack.bin.gz
+
+  **Author**: kuilin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{binary search means searching a binary stream, right :D}

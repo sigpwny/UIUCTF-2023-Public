@@ -1,0 +1,21 @@
+name: "Finding Jonah?"
+author: "David"
+category: osint
+description: "Jonah offered a reward to whoever can find out what hotel he is staying in. Based on the past information (chals), can you find out what the hotel he stayed at was? Flag should be uiuctf{hotel_name_inn} "
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{hampton_inn}
+  - uiuctf{hilton}
+files:
+  - chicago.jpeg
+tags:
+  - osint
+  - zip-code
+hints:
+ - what does joy translate to?
+state: visible

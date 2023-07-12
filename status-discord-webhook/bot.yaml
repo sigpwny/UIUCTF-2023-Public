@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: status-discord-webhook
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: status-discord-webhook-role
+  namespace: default
+rules:
+  - apiGroups: ["*"]
+    resources:
+      - challenges
+      - deployments
+      - services
+      - ingresses
+    verbs:
+      - get
+      - list
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: status-discord-webhook-role-binding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: status-discord-webhook
+    namespace: default
+roleRef:
+  kind: Role
+  name: status-discord-webhook-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: status-discord-webhook
+  namespace: default
+  labels:
+    app: status-discord-webhook
+spec:
+  selector:
+    matchLabels:
+      app: status-discord-webhook
+  template:
+    metadata:
+      labels:
+        app: status-discord-webhook
+        # kctf policy block-internal also allows egress to external
+        uiuctf-egress: k8s-api
+    spec:
+      containers:
+        - name: bot
+          image: us.gcr.io/dotted-forest-314903/status-discord-webhook-bot:6cb2c3ffa5cf6efbdfa0bf2e65097747b7982641e937446f996e8c9203641503
+          env:
+            - name: MESSAGE_ID
+              value: '1124491455088574567'
+          envFrom:
+            - secretRef:
+                name: status-discord-webhook-secrets
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+      serviceAccountName: status-discord-webhook

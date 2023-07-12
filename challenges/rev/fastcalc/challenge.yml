@@ -1,0 +1,24 @@
+name: Fast Calculator
+author: Minh
+category: rev
+description: |-
+  Check out our new super fast calculator!
+
+  This challenge is sponsored by Battelle.
+
+  **Author**: Minh
+value: 500
+type: dynamic
+tags:
+  - medium
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{n0t_So_f45t_w1th_0bscur3_b1ts_of_MaThs} 
+files:
+  - challenge/calc
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

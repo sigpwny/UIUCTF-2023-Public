@@ -1,0 +1,2 @@
+fuse-python==1.0.5
+numpy==1.25.0

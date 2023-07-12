@@ -1,0 +1,47 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: geoguesser
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/geoguesser-healthcheck:e670566d6aed4f7c3f5bdd601e7902a13e636abe7f92b11efba27a5e30e67834
+  image: us.gcr.io/dotted-forest-314903/geoguesser-challenge:d54a1127ddf1f54d0fb81b871f5b0c546db0c44517076d79e903968b20c621ae
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: geoguesser
+  labels:
+    app: geoguesser
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`geoguesser.chal.uiuc.tf`)
+      services:
+        - name: geoguesser
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geoguesser-cname
+  labels:
+    app: geoguesser
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: geoguesser.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

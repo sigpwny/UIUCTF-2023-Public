@@ -1,0 +1,142 @@
+diff --git a/CTFd/views.py b/CTFd/views.py
+index 57536288..5359926b 100644
+--- a/CTFd/views.py
++++ b/CTFd/views.py
+@@ -1,6 +1,6 @@
+ import os  # noqa: I001
+ 
+-from flask import Blueprint, abort
++from flask import Blueprint, abort, get_flashed_messages
+ from flask import current_app as app
+ from flask import (
+     make_response,
+@@ -66,6 +66,8 @@ from CTFd.utils.security.signing import (
+ )
+ from CTFd.utils.uploads import get_uploader, upload_file
+ from CTFd.utils.user import authed, get_current_team, get_current_user, is_admin
++from CTFd.utils.config.visibility import scores_visible
++from CTFd.utils.scores import get_standings
+ 
+ views = Blueprint("views", __name__)
+ 
+@@ -362,6 +364,120 @@ def static_html(route):
+     :param route:
+     :return:
+     """
++    try:
++        if route == "index":
++            def _get_infos(endpoint):
++                return get_flashed_messages(category_filter=endpoint + ".infos")
++
++
++            def _get_errors(endpoint):
++                return get_flashed_messages(category_filter=endpoint + ".errors")
++
++            # Include settings form values
++            settings_infos = _get_infos("/settings")
++            settings_errors = _get_errors("/settings")
++            user = get_current_user()
++
++            # Include scoreboard values
++            scoreboard_infos = _get_infos("/scoreboard")
++
++            if config.is_scoreboard_frozen():
++                scoreboard_infos.append("Scoreboard has been frozen")
++
++            if is_admin() is True and scores_visible() is False:
++                scoreboard_infos.append("Scores are not currently visible to users")
++
++            scoreboard_standings = get_standings()
++
++            if user is not None:
++
++                if is_teams_mode() and get_current_team() is None:
++                    team_url = url_for("teams.private")
++                    settings_infos.append(
++                        markup(
++                            f'In order to participate you must either <a href="{team_url}">join or create a team</a>.'
++                        )
++                    )
++
++                tokens = UserTokens.query.filter_by(user_id=user.id).all()
++
++                prevent_name_change = get_config("prevent_name_change")
++
++                if get_config("verify_emails") and not user.verified:
++                    confirm_url = markup(url_for("auth.confirm"))
++                    settings_infos.append(
++                        markup(
++                            "Your email address isn't confirmed!<br>"
++                            "Please check your email to confirm your email address.<br><br>"
++                            f'To have the confirmation email resent please <a href="{confirm_url}">click here</a>.'
++                        )
++                    )
++
++
++                # Private Profile Info
++                privateuser_infos = _get_infos("/profile")
++                privateuser_errors = _get_errors("/profile")
++
++                if config.is_scoreboard_frozen():
++                    privateuser_infos.append("Scoreboard has been frozen")
++
++                # Private Team Info
++                privateteam_infos = _get_infos("/team")
++                privateteam_errors = _get_errors("/team")
++                privateteam_kwargs = {}
++                if not user.team_id:
++                    privateteam_kwargs = { "privateteam_enrollment_needed": True }
++                else:
++                    team_id = user.team_id
++
++                    team = Teams.query.filter_by(id=team_id).first_or_404()
++                    solves = team.get_solves()
++                    awards = team.get_awards()
++
++                    place = team.place
++                    score = team.score
++
++                    if config.is_scoreboard_frozen():
++                        privateteam_infos.append("Scoreboard has been frozen")
++                    privateteam_kwargs = {
++                        "team":team,
++                        "privateteam_enrollment_needed": False,
++                        "privateteam_solves":solves,
++                        "privateteam_awards":awards,
++                        "privateteam_score":score,
++                        "privateteam_place":place,
++                        "privateteam_score_frozen":config.is_scoreboard_frozen(),
++                        "privateteam_infos":privateteam_infos,
++                        "privateteam_errors":privateteam_errors,
++
++                    }
++
++                return render_template(
++                    "desktop.html",
++                    **privateteam_kwargs,
++                    user=user,
++                    privateuser_account=user.account,
++                    privateuser_infos=privateuser_infos,
++                    privateuser_errors=privateuser_errors,
++                    settings_name=user.name,
++                    settings_email=user.email,
++                    settings_language=getattr(user, "language", None),
++                    settings_website=user.website,
++                    settings_affiliation=user.affiliation,
++                    settings_country=user.country,
++                    settings_tokens=tokens,
++                    settings_prevent_name_change=prevent_name_change,
++                    settings_infos=settings_infos,
++                    settings_errors=settings_errors,
++                    scoreboard_standings=scoreboard_standings,
++                    scoreboard_infos=scoreboard_infos,
++                )
++            else:
++                return render_template("desktop.html",  user={}, team={},
++                    scoreboard_standings=scoreboard_standings,
++                    scoreboard_infos=scoreboard_infos)
++    except TemplateNotFound:
++        pass
+     page = get_page(route)
+     if page is None:
+         abort(404)

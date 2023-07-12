@@ -1,0 +1,18 @@
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+PermitRootLogin no
+
+UsePAM yes
+
+AllowAgentForwarding no
+PermitTTY no
+X11Forwarding no
+PermitTunnel no
+GatewayPorts no
+PrintLastLog no
+PrintMotd no
+
+ForceCommand /usr/sbin/nologin
+AllowUsers user

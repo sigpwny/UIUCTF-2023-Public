@@ -1,0 +1,7 @@
+CLUSTER_TYPE=gce
+PROJECT=dotted-forest-314903
+ZONE=us-central1-a
+REGISTRY=us.gcr.io
+CLUSTER_NAME=kctf-cluster
+DOMAIN_NAME=chal.uiuc.tf
+EMAIL_ADDRESS=sigpwny@gmail.com

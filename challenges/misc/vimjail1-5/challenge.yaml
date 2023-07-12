@@ -1,0 +1,47 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: vimjail1-5
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/vimjail1-5-healthcheck:702783e067baf248a81acf6d8b85807334824bd1427e22d0c36ba3d714ae97ff
+  image: us.gcr.io/dotted-forest-314903/vimjail1-5-challenge:05e9278c37d0b6f42b002cbff355dc8ae14029e7d41bc0e73556e333ec50d882
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: vimjail1-5
+  labels:
+    app: vimjail1-5
+spec:
+  entryPoints:
+    - tcp
+  routes:
+    - match: HostSNI(`vimjail1-5.chal.uiuc.tf`)
+      services:
+        - name: vimjail1-5
+          port: 1337
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vimjail1-5-cname
+  labels:
+    app: vimjail1-5
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: vimjail1-5.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ctfd-redis
+  labels:
+    app: ctfd-redis
+spec:
+  selector:
+    matchLabels:
+      app: ctfd-redis
+  template:
+    metadata:
+      labels:
+        app: ctfd-redis
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: redis
+          image: us.gcr.io/dotted-forest-314903/ctfd-redis:73bb755269e318797defe0285018cff5e700ec3ae4e62e48397fdc101300eb7b
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli ping
+            initialDelaySeconds: 45
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ctfd-redis
+  labels:
+    app: ctfd-redis
+spec:
+  selector:
+    app: ctfd-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: NodePort

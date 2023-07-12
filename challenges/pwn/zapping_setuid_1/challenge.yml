@@ -1,0 +1,28 @@
+name: "Zapping a Setuid 1"
+author: "YiFei Zhu"
+category: pwn
+description: |-
+  I was reading [how Zapps work](https://zapps.app/technology/) the other day
+  and I thought I could [do better](https://github.com/warptools/ldshim/issues/1).
+  However, what happens when a setuid was zapped?
+
+  `$ socat file:$(tty),raw,echo=0 tcp:zapp-setuid-1.chal.uiuc.tf:1337`
+
+  Handout: [ZSTD (99.63 MB)](https://cdn.discordapp.com/attachments/1008912371881889935/1124449799819755562/handout.tar.zst)
+  or [GZ (125.91 MB)](https://cdn.discordapp.com/attachments/1008912371881889935/1124450680648773672/handout.tar.gz)
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{did-you-see-why-its-in-usr-lib-now-0cd5fb56}
+hints:
+  - Oops I left [CVE-2009-0876](https://bugs.gentoo.org/260331) open.
+tags:
+  - systems
+state: visible
+version: "0.1"

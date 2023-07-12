@@ -1,0 +1,26 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: pwnykey
+author: arxenix
+category: rev
+description: |-
+  Can you obtain a valid pwnyOS activation key?
+
+  [Link](https://pwnykey-web.chal.uiuc.tf)
+
+  **Author**: arxenix
+value: 500
+type: dynamic
+tags:
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{abbe62185750af9c2e19e2f2}
+files:
+  - handout.tar.gz
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

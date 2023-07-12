@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: instancer-certbot-CHALLENGE_NAME-pvc
+  namespace: kctf-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Mi
+  storageClassName: standard-rwo
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: instancer-certbot-CHALLENGE_NAME
+  namespace: kctf-system
+  labels:
+    app: instancer-certbot
+    chal: CHALLENGE_NAME
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: instancer-certbot
+        chal: CHALLENGE_NAME
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: certbot
+          image: certbot/dns-google
+          command:
+            - sh
+            - -c
+            - certbot certonly
+                --non-interactive --agree-tos
+                -m EMAIL_ADDRESS
+                --dns-google -d '*.DOMAIN' &&
+              cp -Lr /etc/letsencrypt/live/DOMAIN /export
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - mountPath: /export/
+              name: certs
+      volumes:
+        - name: certs
+          persistentVolumeClaim:
+           claimName: instancer-certbot-CHALLENGE_NAME-pvc
+      serviceAccountName: external-dns-sa
+      restartPolicy: Never
+  ttlSecondsAfterFinished: 60

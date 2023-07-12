@@ -1,0 +1,22 @@
+#!/bin/bash
+# Copyright 2021-2023 Google LLC.
+# SPDX-License-Identifier: MIT
+
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+set -x
+
+mount -n -t proc -o nosuid,noexec,nodev proc /proc/
+mount -n -o remount,rw /
+
+mkdir -p /dev /sys /etc
+
+mount -n -t sysfs -o nosuid,noexec,nodev sys /sys
+mount -n -t tmpfs -o mode=1777 tmpfs /tmp
+
+if ! mount -n -t 9p flag -o nosuid,noexec,nodev,version=9p2000.L,trans=virtio,msize=104857600,access=0 /mnt; then
+    mount -n -t tmpfs -o nosuid,noexec,nodev,mode=0700 tmpfs /mnt
+    echo 'uiuctf{FAKEFLAG}' > /mnt/flag
+fi
+
+cd /home/user && exec setsid bash -l 0<>"/dev/ttyS0" 1>&0 2>&0

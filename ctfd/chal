@@ -1,0 +1,825 @@
+#!/bin/bash
+# Copyright 2020-2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+source "${KCTF_BIN}/kctf-log"
+
+CHALLENGE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+CHALLENGE_NAME="$(basename "$CHALLENGE_DIR")"
+CHALLENGE_NAMESPACE=default
+
+export CHALLENGE_DIR
+export CHALLENGE_NAME
+export CHALLENGE_NAMESPACE
+
+if [[ "$OSTYPE" =~ ^darwin.* ]]; then
+  GETOPT="$(brew --prefix gnu-getopt)/bin/getopt"
+else
+  GETOPT="getopt"
+fi
+
+function has_cluster_config {
+  [[ ! -z "${CLUSTER_NAME-}" ]]
+}
+
+function require_cluster_config {
+  if ! has_cluster_config; then
+    _kctf_log_err "No config loaded. You need to run \"kctf cluster\" first."
+    exit 1
+  fi
+}
+
+function require_active_challenge {
+  if [[ -z "${CHALLENGE_DIR-}" ]]; then
+    _kctf_log_err "No active challenge, please cd to a challenge directory first."
+    exit 1
+  fi
+}
+
+function parse_help_arg_only_usage {
+  echo -e "usage: ./chal ${COMMAND} [args]" >&2
+  echo -e "" >&2
+  echo -e "${DESCRIPTION}" >&2
+  echo -e "" >&2
+  echo -e "Args:" >&2
+  echo -e "  -h|--help        print this help" >&2
+}
+
+function parse_help_arg_only {
+  OPTS="h"
+  LONGOPTS="help"
+  PARSED=$(${GETOPT} --options=$OPTS --longoptions=$LONGOPTS --name "./chal ${COMMAND}" -- "$@")
+  if [[ $? -ne 0 ]]; then
+    parse_help_arg_only_usage
+    exit 1
+  fi
+  eval set -- "$PARSED"
+
+  while true; do
+    case "$1" in
+      -h|--help)
+        parse_help_arg_only_usage
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        _kctf_log_err "Unrecognized argument \"$1\"."
+        parse_help_arg_only_usage
+        exit 1
+        ;;
+    esac
+  done
+
+  require_active_challenge
+}
+
+function parse_container_name_usage {
+  echo -e "usage: ./chal ${COMMAND} [args]" >&2
+  echo -e "  -h|--help        print this help" >&2
+  echo -e "  --container      name of the container to interact with, e.g. ctfd (default), nginx, or redis" >&2
+}
+
+function parse_container_name {
+  OPTS="h"
+  LONGOPTS="help,container:"
+  PARSED=$(${GETOPT} --options=$OPTS --longoptions=$LONGOPTS --name "./chal ${COMMAND}" -- "$@")
+  if [[ $? -ne 0 ]]; then
+    parse_container_name_usage
+    exit 1
+  fi
+  eval set -- "$PARSED"
+
+  CONTAINER="ctfd"
+  while true; do
+    case "$1" in
+      -h|--help)
+        parse_container_name_usage
+        exit 0
+        ;;
+      --container)
+        CONTAINER="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        _kctf_log_err "Unrecognized argument \"$1\"."
+        parse_container_name_usage
+        exit 1
+        ;;
+    esac
+  done
+
+  APP=ctfd
+  if [[ $CONTAINER == redis ]]; then
+    APP=ctfd-redis
+  fi
+
+  require_active_challenge
+}
+
+function build_image {
+  # build the image
+  CONTAINER_NAME="$1"
+  CONTAINER_DIR="${CHALLENGE_DIR}/${CONTAINER_NAME}"
+  _kctf_log "building image in \"${CONTAINER_DIR}\""
+  IIDFILE="$(mktemp)"
+  if find "${CONTAINER_DIR}" -type l -exec false {} + >/dev/null 2>/dev/null; then
+    docker build --platform linux/amd64 "${CONTAINER_DIR}" --iidfile "${IIDFILE}"
+  else
+    _kctf_log "found symlink, building with tar -czh | docker"
+    tar -C "${CONTAINER_DIR}" -czh . | docker build --platform linux/amd64 --iidfile "${IIDFILE}" -
+  fi
+  if [[ $? -ne 0 ]]; then
+    rm "${IIDFILE}"
+    return 1
+  fi
+  IMAGE_ID=$(cat "${IIDFILE}")
+  rm "${IIDFILE}"
+
+  # strip optional sha256 prefix
+  if [[ "${IMAGE_ID}" = sha256:* ]]; then
+    IMAGE_ID=$(echo "${IMAGE_ID}" | cut -d ':' -f 2)
+  fi
+  _kctf_log "Image ID \"${IMAGE_ID}\""
+}
+
+function build_images {
+  build_image ctfd || return
+  CTFD_IMAGE_LOCAL="${IMAGE_ID}"
+  build_image nginx || return
+  NGINX_IMAGE_LOCAL="${IMAGE_ID}"
+  build_image redis || return
+  REDIS_IMAGE_LOCAL="${IMAGE_ID}"
+}
+
+function push_image {
+  IMAGE_NAME=$1
+  IMAGE_ID=$2
+
+  case "${CLUSTER_TYPE}" in
+    gce)
+      IMAGE_URL="${REGISTRY}/${PROJECT}/${CHALLENGE_NAME}-${IMAGE_NAME}:${IMAGE_ID}"
+      docker tag "${IMAGE_ID}" "${IMAGE_URL}" || return
+      docker push "${IMAGE_URL}" || return
+      ;;
+    kind)
+      IMAGE_URL="kind/${IMAGE_NAME}:${IMAGE_ID}"
+      docker tag "${IMAGE_ID}" "${IMAGE_URL}" || return
+      "${KCTF_BIN}/kind" load docker-image --name "${CLUSTER_NAME}" "${IMAGE_URL}" || return
+      ;;
+    *)
+      _kctf_log_err "unknown cluster type \"${CLUSTER_TYPE}\""
+      return 1
+      ;;
+  esac
+  _kctf_log "Image pushed to \"${IMAGE_URL}\""
+}
+
+function push_images {
+  push_image "ctfd" "${CTFD_IMAGE_LOCAL}" || return
+  CTFD_IMAGE_REMOTE="${IMAGE_URL}"
+  push_image "nginx" "${NGINX_IMAGE_LOCAL}" || return
+  NGINX_IMAGE_REMOTE="${IMAGE_URL}"
+  push_image "redis" "${REDIS_IMAGE_LOCAL}" || return
+  REDIS_IMAGE_REMOTE="${IMAGE_URL}"
+}
+
+function kctf_chal_start {
+  require_cluster_config
+  COMMAND="start" DESCRIPTION="Deploy CTFd to the cluster." parse_help_arg_only $@ || return
+  build_images || return
+  push_images || return
+
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"ctfd\") | .spec.template.spec.containers.[] | select(.name == \"ctfd\").image) = \"${CTFD_IMAGE_REMOTE}\"" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"ctfd\") | .spec.template.spec.containers.[] | select(.name == \"nginx\").image) = \"${NGINX_IMAGE_REMOTE}\"" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"ctfd-redis\") | .spec.template.spec.containers.[] | select(.name == \"redis\").image) = \"${REDIS_IMAGE_REMOTE}\"" --inplace "${CHALLENGE_DIR}/ctfd.redis.yaml"
+
+  CTFD_STATIC_IP=$(gcloud compute addresses list --filter "name=ctfd-static-ip" --format 'get(address)')
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Service\") | select(.metadata.name == \"ctfd\") | .spec.loadBalancerIP) = \"${CTFD_STATIC_IP}\"" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+
+  EXISTING_REDIS_INSTANCE=$(gcloud redis instances list --region "${ZONE::${#ZONE}-2}" --filter "name:ctfd-redis" --format 'get(name)' 2>/dev/null)
+  if [[ -z "${EXISTING_REDIS_INSTANCE}" ]]; then
+    "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.redis.yaml" || return
+  fi
+
+  if git config --local --get filter.git-crypt.smudge > /dev/null; then
+    "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.secret.yaml" || return
+  fi
+  "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.yaml" || return
+}
+
+function kctf_chal_stop {
+  require_cluster_config
+  COMMAND="stop" DESCRIPTION="Stop CTFd running on the cluster." parse_help_arg_only $@ || return
+
+  "${KCTF_BIN}/kubectl" delete -f "${CHALLENGE_DIR}/ctfd.yaml" || return
+}
+
+function kctf_chal_status {
+  require_cluster_config
+  COMMAND="status" DESCRIPTION="Print the CTFd status." parse_help_arg_only $@ || return
+
+  SUFFIX=$(echo "${PROJECT}-${CLUSTER_NAME}-${ZONE}" | sha1sum)
+  BUCKET_NAME="ctfd-storage-${SUFFIX:0:16}"
+
+  echo "= INFRA ="
+  echo
+  gcloud sql instances list --filter "name:ctfd-db"
+  gcloud redis instances list --region "${ZONE::${#ZONE}-2}" --filter "name:ctfd-redis"
+  gcloud storage buckets list --filter "name:${BUCKET_NAME}"
+  echo
+  echo "= DEPLOYMENTS ="
+  echo
+  "${KCTF_BIN}/kubectl" get deployments -l "app in (ctfd,ctfd-redis)" --namespace "${CHALLENGE_NAMESPACE}"
+  echo
+  echo "= PODs ="
+  echo
+  "${KCTF_BIN}/kubectl" get pods -l "app in (ctfd,ctfd-redis)" -o wide --namespace "${CHALLENGE_NAMESPACE}"
+  echo
+  echo "= EXTERNAL SERVICES ="
+  echo
+  echo "SERVICES:"
+  "${KCTF_BIN}/kubectl" get services -l "app in (ctfd,ctfd-redis)" -o custom-columns="NAME:.metadata.name,TYPE:.spec.type,EXTERNAL-IP:.status.loadBalancer.ingress[*]['ip'],PORT:.spec.ports[*].port,DNS:.metadata.annotations['external-dns\\.alpha\\.kubernetes\\.io/hostname']" --namespace "${CHALLENGE_NAMESPACE}"
+}
+
+function gen_password {
+  head -c 48 /dev/urandom | base64 -w0 | tr '+/' '-_'
+}
+
+function get_specs() {
+  case "$1" in
+    before)
+      SQL_TIER=db-f1-micro
+      SQL_AVAILABILITY_TYPE=ZONAL
+      REDIS_TIER=gke
+      CTFD_WORKERS=4
+      CTFD_CPU_REQUEST=500m
+      CTFD_CPU_LIMIT=2000m
+      CTFD_MIN_REPLICAS=1
+      CTFD_MAX_REPLICAS=1
+      ;;
+    during)
+      SQL_TIER=db-custom-2-7680
+      SQL_AVAILABILITY_TYPE=REGIONAL
+      REDIS_TIER=basic
+      REDIS_SIZE=2
+      CTFD_WORKERS=9
+      CTFD_CPU_REQUEST=1000m
+      CTFD_CPU_LIMIT=4000m
+      CTFD_MIN_REPLICAS=4
+      CTFD_MAX_REPLICAS=16
+      ;;
+    after)
+      SQL_TIER=db-custom-2-7680
+      SQL_AVAILABILITY_TYPE=ZONAL
+      REDIS_TIER=gke
+      CTFD_WORKERS=9
+      CTFD_CPU_REQUEST=1000m
+      CTFD_CPU_LIMIT=4000m
+      CTFD_MIN_REPLICAS=2
+      CTFD_MAX_REPLICAS=4
+      ;;
+    *)
+      _kctf_log_err "unexpected scale, must be one of: before, during, after"
+      exit 1
+      ;;
+  esac
+}
+
+required_apis=("sqladmin.googleapis.com" "redis.googleapis.com")
+
+function check_required_apis {
+  GCP_APIS="$(gcloud services list --format 'get(config.name)')"
+  for required_api in "${required_apis[@]}"; do
+    if [[ ! "${GCP_APIS}" =~ "${required_api}" ]]; then
+      _kctf_log_err "Required GCP API \"${required_api}\" is not enabled"
+      return 1
+    fi
+  done
+  return 0
+}
+
+function kctf_chal_setup {
+  SUFFIX=$(echo "${PROJECT}-${CLUSTER_NAME}-${ZONE}" | sha1sum)
+  NETWORK="kctf-network-${SUFFIX:0:16}"
+  BUCKET_NAME="ctfd-storage-${SUFFIX:0:16}"
+
+  if ! check_required_apis; then
+    _kctf_log_err "Please enable the required APIs by running 'gcloud services enable ${required_apis[@]}'"
+    return 1
+  fi
+
+  get_specs before
+
+  if ! [[ -f "${CHALLENGE_DIR}/ctfd.secret.yaml" ]]; then
+    _kctf_log "creating ctfd.secret.yaml"
+    SECRET_KEY=$(gen_password)
+    cp "${CHALLENGE_DIR}/ctfd.secret.template.yaml" "${CHALLENGE_DIR}/ctfd.secret.yaml"
+    "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.SECRET_KEY) = \"${SECRET_KEY}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+  fi
+
+  EXISTING_IP_RANGE=$(gcloud compute addresses list --filter "name:${NETWORK}-services-ip-range" --format 'get(name)')
+  if [[ -z "${EXISTING_IP_RANGE}" ]]; then
+    _kctf_log "creating new service IP range \"${NETWORK}-services-ip-range\""
+    gcloud compute addresses create "${NETWORK}-services-ip-range" \
+      --global \
+      --network "$NETWORK" \
+      --purpose VPC_PEERING \
+      --prefix-length 20 \
+      || return
+  fi
+
+  EXISTING_VPC_PEERINGS_RANGES=$(gcloud services vpc-peerings list --network "$NETWORK" --service servicenetworking.googleapis.com --format 'get(reservedPeeringRanges)')
+  if [[ -z "${EXISTING_VPC_PEERINGS_RANGES}" ]]; then
+    _kctf_log "creating new private connection \"servicenetworking.googleapis.com\""
+    gcloud services vpc-peerings connect \
+      --network "$NETWORK" \
+      --ranges "${NETWORK}-services-ip-range" \
+      || return
+  elif [[ "${EXISTING_VPC_PEERINGS_RANGES}" != "${NETWORK}-services-ip-range" ]]; then
+    _kctf_log "updating private connection \"servicenetworking.googleapis.com\""
+    gcloud services vpc-peerings update \
+      --service=servicenetworking.googleapis.com \
+      --network "$NETWORK" \
+      --ranges "${NETWORK}-services-ip-range" \
+      --force \
+      || return
+  fi
+
+  EXISTING_SQL_INSTANCE=$(gcloud sql instances list --filter "name:ctfd-db" --format 'get(name)' 2>/dev/null)
+  if [[ -z "${EXISTING_SQL_INSTANCE}" ]]; then
+    _kctf_log "creating new cloud SQL instance \"ctfd-db\""
+    gcloud alpha sql instances create ctfd-db \
+      --region "${ZONE::${#ZONE}-2}" \
+      --network "$NETWORK" \
+      --no-assign-ip \
+      --allocated-ip-range-name "${NETWORK}-services-ip-range" \
+      --availability-type "$SQL_AVAILABILITY_TYPE" \
+      --tier "$SQL_TIER" \
+      --storage-size 10 \
+      --enable-bin-log \
+      --maintenance-window-day WED \
+      --maintenance-window-hour 8 \
+      || return
+  fi
+
+  EXISTING_SQL_CTFD_USER=$(gcloud sql users list --instance ctfd-db --filter "name:ctfd" --format 'get(name)')
+  if [[ -z "${EXISTING_SQL_CTFD_USER}" ]]; then
+    _kctf_log "creating new cloud SQL user \"ctfd\""
+    SQL_PASSWORD="$(gen_password)"
+    gcloud sql users create ctfd \
+      --instance ctfd-db \
+      --password "$SQL_PASSWORD" \
+      || return
+
+    SQL_INSTANCE_IP=$(gcloud sql instances describe ctfd-db --format 'get(ipAddresses.ipAddress)')
+    DATABASE_URL="mysql+pymysql://ctfd:${SQL_PASSWORD}@${SQL_INSTANCE_IP}/ctfd"
+    "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.DATABASE_URL) = \"${DATABASE_URL}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+  fi
+
+  if [[ $REDIS_TIER == gke ]]; then
+    REDIS_URL="redis://ctfd-redis.${CHALLENGE_NAMESPACE}.svc.cluster.local:6379"
+    "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.REDIS_URL) = \"${REDIS_URL}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+  else
+    EXISTING_REDIS_INSTANCE=$(gcloud redis instances list --region "${ZONE::${#ZONE}-2}" --filter "name:ctfd-redis" --format 'get(name)' 2>/dev/null)
+    if [[ -z "${EXISTING_REDIS_INSTANCE}" ]]; then
+      _kctf_log "creating new cloud Redis instance \"ctfd-redis\""
+      gcloud redis instances create ctfd-redis \
+        --region "${ZONE::${#ZONE}-2}" \
+        --connect-mode private-service-access \
+        --network "$NETWORK" \
+        --reserved-ip-range "${NETWORK}-services-ip-range" \
+        --tier "$REDIS_TIER" \
+        --size "$REDIS_SIZE" \
+        --zone "$ZONE" \
+        --maintenance-window-day wednesday \
+        --maintenance-window-hour 8 \
+        || return
+
+      REDIS_INSTANCE_IP=$(gcloud redis instances describe ctfd-redis --region "${ZONE::${#ZONE}-2}" --format 'get(host)')
+      REDIS_INSTANCE_PORT=$(gcloud redis instances describe ctfd-redis --region "${ZONE::${#ZONE}-2}" --format 'get(port)')
+      REDIS_URL="redis://${REDIS_INSTANCE_IP}:${REDIS_INSTANCE_PORT}"
+      "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.REDIS_URL) = \"${REDIS_URL}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+    fi
+  fi
+
+  EXISTING_STORAGE_BUCKET=$(gcloud storage buckets list --filter "name:${BUCKET_NAME}" --format 'get(name)')
+  if [[ -z "${EXISTING_STORAGE_BUCKET}" ]]; then
+    _kctf_log "creating new storage bucket \"${BUCKET_NAME}\""
+    gcloud storage buckets create "gs://${BUCKET_NAME}" \
+      --location us \
+      --uniform-bucket-level-access \
+      || return
+
+    AWS_S3_BUCKET="$BUCKET_NAME"
+    "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.AWS_S3_BUCKET) = \"${AWS_S3_BUCKET}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+  fi
+
+  EXISTING_SERVICE_ACCOUNT=$(gcloud iam service-accounts list --filter "email=ctfd-storage-account@${PROJECT}.iam.gserviceaccount.com" --format 'get(email)')
+  if [[ -z "${EXISTING_SERVICE_ACCOUNT}" ]]; then
+    _kctf_log "creating new service account \"ctfd-storage-account\""
+    gcloud iam service-accounts create "ctfd-storage-account" || return
+
+    HMAC_OUTPUT="$(gsutil hmac create "ctfd-storage-account@${PROJECT}.iam.gserviceaccount.com" || return)"
+    AWS_ACCESS_KEY_ID=$(echo "$HMAC_OUTPUT" | "${KCTF_BIN}/yq" eval '.["Access ID"]' -)
+    "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.AWS_ACCESS_KEY_ID) = \"${AWS_ACCESS_KEY_ID}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+    AWS_SECRET_ACCESS_KEY=$(echo "$HMAC_OUTPUT" | "${KCTF_BIN}/yq" eval '.Secret' -)
+    "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.AWS_SECRET_ACCESS_KEY) = \"${AWS_SECRET_ACCESS_KEY}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+
+    gsutil iam ch serviceAccount:"ctfd-storage-account@${PROJECT}.iam.gserviceaccount.com":objectAdmin "gs://${BUCKET_NAME}" || return
+  fi
+
+  EXISTING_STATIC_IP=$(gcloud compute addresses list --filter "name=ctfd-static-ip" --format 'get(name)')
+  if [[ -z "${EXISTING_STATIC_IP}" ]]; then
+    _kctf_log "creating new static IP \"ctfd-static-ip\""
+    gcloud compute addresses create ctfd-static-ip --region "${ZONE::${#ZONE}-2}"
+  fi
+
+  _kctf_log "done"
+}
+
+function kctf_chal_scale {
+  SUFFIX=$(echo "${PROJECT}-${CLUSTER_NAME}-${ZONE}" | sha1sum)
+  NETWORK="kctf-network-${SUFFIX:0:16}"
+
+  get_specs "$@"
+
+  _kctf_log "scaling cloud SQL instance \"ctfd-db\""
+  gcloud sql instances patch ctfd-db \
+    --availability-type "$SQL_AVAILABILITY_TYPE" \
+    --tier "$SQL_TIER" \
+    || return
+
+  EXISTING_REDIS_INSTANCE=$(gcloud redis instances list --region "${ZONE::${#ZONE}-2}" --filter "name:ctfd-redis" --format 'get(name)' 2>/dev/null)
+  if [[ $REDIS_TIER == gke ]]; then
+    if [[ -n "${EXISTING_REDIS_INSTANCE}" ]]; then
+      REDIS_URL="redis://ctfd-redis.${CHALLENGE_NAMESPACE}.svc.cluster.local:6379"
+      "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.REDIS_URL) = \"${REDIS_URL}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+      "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.redis.yaml" || return
+      "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.secret.yaml" || return
+
+      _kctf_log "deleting cloud Redis instance \"ctfd-redis\""
+      gcloud redis instances delete ctfd-redis \
+        --region "${ZONE::${#ZONE}-2}"
+    fi
+  else
+    if [[ -n "${EXISTING_REDIS_INSTANCE}" ]]; then
+      _kctf_log "scaling cloud Redis instance \"ctfd-redis\""
+      gcloud redis instances update ctfd-redis \
+        --region "${ZONE::${#ZONE}-2}" \
+        --size "$REDIS_SIZE" \
+        || return
+    else
+      _kctf_log "creating new cloud Redis instance \"ctfd-redis\""
+      gcloud redis instances create ctfd-redis \
+        --region "${ZONE::${#ZONE}-2}" \
+        --connect-mode private-service-access \
+        --network "$NETWORK" \
+        --reserved-ip-range "${NETWORK}-services-ip-range" \
+        --tier "$REDIS_TIER" \
+        --size "$REDIS_SIZE" \
+        --zone "$ZONE" \
+        --maintenance-window-day wednesday \
+        --maintenance-window-hour 8 \
+        || return
+
+      REDIS_INSTANCE_IP=$(gcloud redis instances describe ctfd-redis --region "${ZONE::${#ZONE}-2}" --format 'get(host)')
+      REDIS_INSTANCE_PORT=$(gcloud redis instances describe ctfd-redis --region "${ZONE::${#ZONE}-2}" --format 'get(port)')
+      REDIS_URL="redis://${REDIS_INSTANCE_IP}:${REDIS_INSTANCE_PORT}"
+      "${KCTF_BIN}/yq" eval "(select(.kind == \"Secret\") | select(.metadata.name == \"ctfd-secrets\") | .stringData.REDIS_URL) = \"${REDIS_URL}\"" --inplace "${CHALLENGE_DIR}/ctfd.secret.yaml"
+      "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.secret.yaml" || return
+
+      "${KCTF_BIN}/kubectl" delete -f "${CHALLENGE_DIR}/ctfd.redis.yaml" || return
+    fi
+  fi
+
+  _kctf_log "scaling k8s deployment instance \"ctfd\""
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"ctfd\") | .spec.template.spec.containers[] | select(.name == \"ctfd\").env[] | select(.name == \"WORKERS\").value) = \"${CTFD_WORKERS}\"" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"ctfd\") | .spec.template.spec.containers[] | select(.name == \"ctfd\").resources.requests.cpu) = \"${CTFD_CPU_REQUEST}\"" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"ctfd\") | .spec.template.spec.containers[] | select(.name == \"ctfd\").resources.limits.cpu) = \"${CTFD_CPU_LIMIT}\"" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"HorizontalPodAutoscaler\") | select(.metadata.name == \"ctfd\") | .spec.minReplicas) = ${CTFD_MIN_REPLICAS}" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"HorizontalPodAutoscaler\") | select(.metadata.name == \"ctfd\") | .spec.maxReplicas) = ${CTFD_MAX_REPLICAS}" --inplace "${CHALLENGE_DIR}/ctfd.yaml"
+  "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/ctfd.yaml" || return
+
+  _kctf_log "done"
+}
+
+function kctf_chal_destroy {
+  SUFFIX=$(echo "${PROJECT}-${CLUSTER_NAME}-${ZONE}" | sha1sum)
+  NETWORK="kctf-network-${SUFFIX:0:16}"
+  BUCKET_NAME="ctfd-storage-${SUFFIX:0:16}"
+
+  read -p "Do you really want to destroy CTFd? If you are sure type the cluster name (${CLUSTER_NAME}): "
+  if [[ ! "${REPLY}" = "${CLUSTER_NAME}" ]]
+  then
+    return 1
+  fi
+
+  _kctf_log "stopping CTFd"
+  kctf_chal_stop
+
+  _kctf_log "deleting static IP \"ctfd-static-ip\""
+  gcloud compute addresses delete ctfd-static-ip --region "${ZONE::${#ZONE}-2}"
+
+  _kctf_log "deleting service account \"ctfd-storage-account\""
+  gcloud iam service-accounts delete "ctfd-storage-account@${PROJECT}.iam.gserviceaccount.com"
+
+  EXISTING_REDIS_INSTANCE=$(gcloud redis instances list --region "${ZONE::${#ZONE}-2}" --filter "name:ctfd-redis" --format 'get(name)' 2>/dev/null)
+  if [[ -n "${EXISTING_REDIS_INSTANCE}" ]]; then
+    _kctf_log "deleting cloud Redis instance \"ctfd-redis\""
+    gcloud redis instances delete ctfd-redis \
+      --region "${ZONE::${#ZONE}-2}"
+  fi
+
+  _kctf_log "stopping cloud SQL instance \"ctfd-db\""
+  gcloud sql instances patch ctfd-db \
+    --activation-policy=NEVER
+
+  _kctf_log "deleting service IP range \"${NETWORK}-services-ip-range\""
+  gcloud compute addresses delete "${NETWORK}-services-ip-range" --global
+
+  _kctf_log "Resources kept:"
+  _kctf_log "cloud SQL instance: $ gcloud sql instances delete ctfd-db"
+  _kctf_log "GCS storage bucket: $ gcloud storage rm --recursive gs://${BUCKET_NAME}"
+  _kctf_log "Please make sure to take a back up before nuking everything."
+}
+
+function kctf_chal_debug_logs_usage {
+  echo -e "usage: ./chal debug logs [args]" >&2
+  echo -e "  -h|--help        print this help" >&2
+  echo -e "  --container      name of the container to interact with, e.g. ctfd (default), nginx, or redis" >&2
+  echo -e "  --tail           how many lines to print per pod (default 20)" >&2
+}
+
+function kctf_chal_debug_logs {
+  require_cluster_config
+
+  OPTS="h"
+  LONGOPTS="help,container:,tail:"
+  PARSED=$(${GETOPT} --options=$OPTS --longoptions=$LONGOPTS --name "./chal ${COMMAND}" -- "$@")
+  if [[ $? -ne 0 ]]; then
+    kctf_chal_debug_logs_usage
+    exit 1
+  fi
+  eval set -- "$PARSED"
+
+  CONTAINER="ctfd"
+  TAIL="20"
+  while true; do
+    case "$1" in
+      -h|--help)
+        kctf_chal_debug_logs_usage
+        exit 0
+        ;;
+      --container)
+        CONTAINER="$2"
+        shift 2
+        ;;
+      --tail)
+        TAIL="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        _kctf_log_err "Unrecognized argument \"$1\"."
+        kctf_chal_debug_logs_usage
+        exit 1
+        ;;
+    esac
+  done
+
+  APP=ctfd
+  if [[ $CONTAINER == redis ]]; then
+    APP=ctfd-redis
+  fi
+
+  require_active_challenge
+
+  pods=($("${KCTF_BIN}/kubectl" get pods -l "app=${APP}" -o jsonpath='{.items[*].metadata.name}' --namespace "${CHALLENGE_NAMESPACE}"))
+
+  if [[ ${#pods[@]} -eq 0 ]]; then
+    _kctf_log_err 'No pods found. Is the challenge running?'
+    return 1
+  fi
+
+  for pod in "${pods[@]}"; do
+    startTime=$("${KCTF_BIN}/kubectl" get "pods/${pod}" -o jsonpath='{.status.startTime}' --namespace "${CHALLENGE_NAMESPACE}")
+    _kctf_log "== ${pod} (started @ ${startTime}) =="
+    "${KCTF_BIN}/kubectl" logs "pods/${pod}" --tail="${TAIL}" -c "${CONTAINER}" --namespace "${CHALLENGE_NAMESPACE}"
+  done
+}
+
+function kctf_chal_debug_ssh {
+  require_cluster_config
+  COMMAND="debug ssh" parse_container_name $@ || return
+
+  pods=($("${KCTF_BIN}/kubectl" get pods -l "app=${APP}" -o jsonpath='{.items[*].metadata.name}' --namespace "${CHALLENGE_NAMESPACE}"))
+  NAMESPACE="${CHALLENGE_NAMESPACE}"
+
+  if [[ ${#pods[@]} -eq 0 ]]; then
+    _kctf_log_err 'No pods found. Is the challenge running?'
+    return 1
+  fi
+
+  pod="${pods[0]}"
+  if [[ ${#pods[@]} -ne 1 ]]; then
+    _kctf_log "Found ${#pods[@]} pods, connecting to the most recent one."
+    _kctf_log "You can list the other pods with 'kubectl get pods'"
+    _kctf_log "and connect to them using 'kubectl exec pod/PODNAME --namespace ${CHALLENGE_NAMESPACE} -it -- /bin/bash'"
+
+    latestStartTime=$(date -d "$("${KCTF_BIN}/kubectl" get "pods/${pod}" -o jsonpath='{.status.startTime}' --namespace "${CHALLENGE_NAMESPACE}")" '+%s')
+    for (( i=1;  i < ${#pods[@]};  i++ )); do
+      otherPod="${pods[$i]}"
+      otherStartTime=$(date -d "$("${KCTF_BIN}/kubectl" get "pods/${otherPod}" -o jsonpath='{.status.startTime}' --namespace "${CHALLENGE_NAMESPACE}")" '+%s')
+      if [[ -z "$("${KCTF_BIN}/kubectl" get "pod/${otherPod}" -o jsonpath="{.status.containerStatuses[?(@.name==\"${CONTAINER}\")].state.running}" --namespace "${CHALLENGE_NAMESPACE}")" ]]; then
+        _kctf_log_warn "skipping pod/${otherPod} since the container \"${CONTAINER}\" is not running"
+        continue
+      fi
+      if [[ "${otherStartTime}" -gt "${latestStartTime}" ]]; then
+        latestStartTime="${otherStartTime}"
+        pod="${otherPod}"
+      fi
+    done
+  fi
+
+  _kctf_log "Connecting to pod ${pod}"
+  "${KCTF_BIN}/kubectl" exec "pod/${pod}" --namespace "${CHALLENGE_NAMESPACE}" -c "${CONTAINER}" -it -- /bin/bash
+}
+
+function kctf_chal_debug_port_forward_usage {
+  echo -e "usage: ./chal debug port-forward [args]" >&2
+  echo -e "args:" >&2
+  echo -e "  -h|--help        print this help" >&2
+  echo -e "  --port:          port in the challenge to connect to (default 80)" >&2
+  echo -e "  --local-port:    local port to listen on (defaults to random free port)" >&2
+}
+
+function kctf_chal_debug_port_forward {
+  REMOTE_PORT=80
+  LOCAL_PORT=""
+
+  OPTS="h"
+  LONGOPTS="help,port:,local-port:"
+  PARSED=$(${GETOPT} --options=$OPTS --longoptions=$LONGOPTS --name "./chal debug port-forward" -- "$@")
+  if [[ $? -ne 0 ]]; then
+    kctf_chal_debug_port_forward_usage
+    exit 1
+  fi
+  eval set -- "$PARSED"
+
+  while true; do
+    case "$1" in
+      -h|--help)
+        kctf_chal_debug_port_forward_usage
+        exit 0
+        ;;
+      --port)
+        REMOTE_PORT="$2"
+        shift 2
+        ;;
+      --local-port)
+        LOCAL_PORT="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        _kctf_log_err "Unrecognized argument \"$1\"."
+        kctf_chal_debug_port_forward_usage
+        exit 1
+        ;;
+    esac
+  done
+
+  require_active_challenge
+
+  _kctf_log 'starting port-forward, ctrl+c to exit'
+  "${KCTF_BIN}/kubectl" port-forward "deployment/ctfd" --namespace "${CHALLENGE_NAMESPACE}" --address=127.0.0.1 "${LOCAL_PORT}:${REMOTE_PORT}"
+}
+
+function kctf_chal_debug_usage {
+  echo -e "usage: ./chal debug command" >&2
+  echo -e "available commands:" >&2
+  echo -e "  logs:         print logs of the container" >&2
+  echo -e "  ssh:          spawn an interactive bash in the container" >&2
+  echo -e "  port-forward: create a port-forward to the container's default port" >&2
+  echo -e "NOTE: you can use --container=nginx flag to debug the nginx" >&2
+}
+
+function kctf_chal_debug {
+  if [[ $# -lt 1 ]]; then
+    _kctf_log_err "unexpected argument count"
+    kctf_chal_debug_usage
+    exit 1
+  fi
+
+  case "$1" in
+    -h|--help)
+      kctf_chal_debug_usage
+      exit 0
+      ;;
+    logs)
+      shift
+      kctf_chal_debug_logs $@
+      ;;
+    ssh)
+      shift
+      kctf_chal_debug_ssh $@
+      ;;
+    port-forward)
+      shift
+      kctf_chal_debug_port_forward $@
+      ;;
+    *)
+      _kctf_log_err "unknown command"
+      kctf_chal_debug_usage
+      exit 1
+      ;;
+  esac
+}
+
+function kctf_chal_usage {
+  echo -e "usage: chal.sh command" >&2
+  echo -e "available commands:" >&2
+  echo -e "  setup:   setup GCE for CTFd" >&2
+  echo -e "  start:   deploy CTFd to the cluster" >&2
+  echo -e "  scale:   upscale / downscale" >&2
+  echo -e "  stop:    delete CTFd from the cluster" >&2
+  echo -e "  destroy: clean up resources used by CTFd" >&2
+  echo -e "  status:  print the current status of CTFd" >&2
+  echo -e "  debug:   commands for debugging CTFd" >&2
+}
+
+if [[ $# -lt 1 ]]; then
+  _kctf_log_err "unexpected argument count"
+  kctf_chal_usage
+  exit 1
+fi
+
+if [[ $CLUSTER_TYPE != gce ]]; then
+  _kctf_log_err "can only setup CTFd on GCE"
+  exit 1
+fi
+
+case "$1" in
+  -h|--help)
+    kctf_chal_usage
+    exit 0
+    ;;
+  setup)
+    shift
+    kctf_chal_setup $@
+    ;;
+  start)
+    shift
+    kctf_chal_start $@
+    ;;
+  scale)
+    shift
+    kctf_chal_scale $@
+    ;;
+  stop)
+    shift
+    kctf_chal_stop $@
+    ;;
+  destroy)
+    shift
+    kctf_chal_destroy $@
+    ;;
+  status)
+    shift
+    kctf_chal_status $@
+    ;;
+  debug)
+    shift
+    kctf_chal_debug $@
+    ;;
+  *)
+    _kctf_log_err "unknown command"
+    kctf_chal_usage
+    exit 1
+    ;;
+esac

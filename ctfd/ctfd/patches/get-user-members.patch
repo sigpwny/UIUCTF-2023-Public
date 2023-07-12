@@ -1,0 +1,43 @@
+diff --git a/CTFd/api/v1/teams.py b/CTFd/api/v1/teams.py
+index a3a2ea37..59b4f9b5 100644
+--- a/CTFd/api/v1/teams.py
++++ b/CTFd/api/v1/teams.py
+@@ -2,6 +2,7 @@ import copy
+ from typing import List
+ 
+ from flask import abort, request, session
++from CTFd.schemas.users import UserSchema
+ from flask_restx import Namespace, Resource
+ 
+ from CTFd.api.v1.helpers.request import validate_args
+@@ -417,9 +418,8 @@ class TeamPrivateMembers(Resource):
+ class TeamMembers(Resource):
+     method_decorators = [require_team_mode]
+ 
+-    @admins_only
+     def get(self, team_id):
+-        team = Teams.query.filter_by(id=team_id).first_or_404()
++        team = Teams.query.filter_by(id=team_id, banned=False, hidden=False).first_or_404()
+ 
+         view = "admin" if is_admin() else "user"
+         schema = TeamSchema(view=view)
+@@ -429,8 +429,18 @@ class TeamMembers(Resource):
+             return {"success": False, "errors": response.errors}, 400
+ 
+         members = response.data.get("members")
++        response = []
++        for member_id in members:
++            user = Users.query.filter_by(id=member_id).first_or_404()
++            dumped_user = UserSchema(view=view).dump(user)._asdict()["data"]
++            solves = SubmissionSchema(view=view, many=True).dump(user.get_solves(admin=is_admin()))._asdict()["data"]
++            print(solves)
++            user_points = sum([s["challenge"]["value"] for s in solves])
++            dumped_user["points"] = user_points
++            print(dumped_user)
++            response.append(dumped_user)
+ 
+-        return {"success": True, "data": members}
++        return {"success": True, "data": response}
+ 
+     @admins_only
+     def post(self, team_id):

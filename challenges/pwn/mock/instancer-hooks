@@ -1,0 +1,14 @@
+#!/bin/bash
+
+CHALLENGE_IMAGES+=(novnc sshsocat bastion)
+
+function instancer_hook_start {
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Job\") | select(.metadata.name == \"INSTANCE_NAME\") | .spec.template.spec.containers.[] | select(.name == \"novnc\").image) = \"${IMAGES_REMOTE[novnc]}\"" --inplace "${INSTANCER_DIR}/instance-templates/${CHALLENGE_NAME}.yaml" || return 1
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Job\") | select(.metadata.name == \"INSTANCE_NAME\") | .spec.template.spec.containers.[] | select(.name == \"sshsocat\").image) = \"${IMAGES_REMOTE[sshsocat]}\"" --inplace "${INSTANCER_DIR}/instance-templates/${CHALLENGE_NAME}.yaml" || return 1
+  "${KCTF_BIN}/yq" eval "(select(.kind == \"Deployment\") | select(.metadata.name == \"mock-bastion\") | .spec.template.spec.containers.[] | select(.name == \"bastion\").image) = \"${IMAGES_REMOTE[bastion]}\"" --inplace "${CHALLENGE_DIR}/mock.yaml" || return 1
+  "${KCTF_BIN}/kubectl" apply -f "${CHALLENGE_DIR}/mock.yaml"
+}
+
+function instancer_hook_stop {
+  "${KCTF_BIN}/kubectl" delete -f "${CHALLENGE_DIR}/mock.yaml"
+}

@@ -1,0 +1,26 @@
+name: "Chainmail"
+author: "Emma Hartman"
+category: pwn
+description: |-
+  I've come up with a winning idea to make it big in the Prodigy and Hotmail scenes (or at least make your email widespread)!
+
+  `nc chainmail.chal.uiuc.tf 1337`
+
+  **Author**: Emma
+
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{y0ur3_4_B1g_5h0t_n0w!11!!1!!!11!!!!1}
+tags:
+  - beginner
+files:
+  - challenge/chal.c
+  - challenge/chal
+  - challenge/Dockerfile
+state: visible
+version: "0.1"

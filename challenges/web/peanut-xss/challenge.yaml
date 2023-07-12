@@ -1,0 +1,26 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: peanut-xss
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: HTTPS
+        targetPort: 80
+  podTemplate:
+    template:
+      spec:
+        containers:
+          - name: challenge
+            securityContext:
+              privileged: false
+              readOnlyRootFilesystem: false
+              allowPrivilegeEscalation: false
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/peanut-xss-healthcheck:fd98e19e250fed70d458cf67c4f735b63930371f8f7d7fa7514a6901ff0c20a2
+  image: us.gcr.io/dotted-forest-314903/peanut-xss-challenge:8ca6524a3c0011f46278b68573d94c5b11fc499032688f34a20db256a8b29adc

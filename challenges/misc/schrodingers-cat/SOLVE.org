@@ -1,0 +1,332 @@
+#+TITLE: Schrodinger's Cat
+#+AUTHOR: George (Shorden)
+*Schrodinger's Cat* was a quantum computing misc challenge +written+ repurposed for UIUCTF 2023.
+The challenge was unrated and had 17 solves during the competition.
+* Description
+#+begin_quote
+Our boss got mad that our SSH keys were weak, so now we're using a quantum computer to be extra secure!
+#+end_quote
+
+#+begin_src python :session main :exports none
+from os import system
+from base64 import b64decode, b64encode
+import numpy as np
+
+from qiskit import QuantumCircuit
+import qiskit.quantum_info as qi
+from qiskit.circuit.library import StatePreparation
+
+WIRES = 5
+
+
+def normalization(msg):
+    assert(len(msg) <= WIRES**2)
+    state = np.array([ord(c) for c in msg.ljust(2**WIRES, ' ')])
+    norm = np.linalg.norm(state)
+    state = state / norm
+    return (state, norm)
+
+def transform(sv, n):
+    legal = lambda c: ord(' ') <= c and c <= ord('~')
+    renormalized = [float(i.real)*n for i in sv]
+    rn_rounded = [round(i) for i in renormalized]
+    if not np.allclose(renormalized, rn_rounded, rtol=0, atol=1e-2):
+        print("Your rehydrated statevector isn't very precise. Try adding at least 6 decimal places of precision, or contact the challenge author if you think this is a mistake.")
+        print(rn_rounded)
+        exit(0)
+    if np.any([not legal(c) for c in rn_rounded]):
+        print("Invalid ASCII characters.")
+        exit(0)
+    return ''.join([chr(n) for n in rn_rounded])
+
+def make_circ(sv, circ):
+    qc = QuantumCircuit(WIRES)
+    qc.append(circ.to_instruction(), range(WIRES))
+    sp = QuantumCircuit(WIRES, name="echo 'Hello, world!'")
+    sp.append(StatePreparation(sv), range(WIRES))
+    qc.append(sp.to_instruction(), range(WIRES))
+    return qc
+
+def print_given(sv, n):
+    placeholder = QuantumCircuit(WIRES, name="Your Circ Here")
+    placeholder.i(0)
+
+    circ = make_circ(sv, placeholder)
+    print(circ.draw(style={
+        "displaytext": {
+            "state_preparation": "<>"
+            }
+        }))
+    new_sv = qi.Statevector.from_instruction(circ)
+    print(f'Normalization constant: {n}')
+    print("\nExecuting...\n")
+    system(transform(new_sv, n))
+
+def main():
+    print("Welcome to the Quantum Secure Shell. Instead of dealing with pesky encryption, just embed your commands into our quantum computer! I batched the next command in with yours, hope you're ok with that!")
+
+    given_sv, given_n = normalization("echo 'Hello, world!'")
+    print_given(given_sv, given_n)
+
+    try:
+        qasm_str = b64decode(input("\nPlease type your OpenQASM circuit as a base64 encoded string: ")).decode()
+    except:
+        print("Error decoding b64!")
+        exit(0)
+    try:
+        circ = QuantumCircuit.from_qasm_str(qasm_str)
+        circ.remove_final_measurements(inplace=True)
+    except:
+        print("Error processing OpenQASM file! Try decomposing your circuit into basis gates using `transpile`.")
+        exit(0)
+    if circ.num_qubits != WIRES:
+        print(f"Your quantum circuit acts on {circ.num_qubits} instead of {WIRES} qubits!")
+        exit(0)
+
+    try:
+        norm = float(input("Please enter your normalization constant (precision matters!): "))
+    except:
+        print("Error processing normalization constant!")
+        exit(0)
+    try:
+        sv_circ = make_circ(given_sv, circ)
+    except:
+        print("Circuit runtime error!")
+        exit(0)
+
+    print(sv_circ.draw())
+    command = transform(qi.Statevector.from_instruction(sv_circ), norm)
+
+    print("\nExecuting...\n")
+    system(command)
+#+end_src
+
+#+RESULTS:
+
+** Hints
+- Hint 0:
+  There are known bugs in OpenQASM transpilation — please use Qiskit, and optimize your circuit before serialization.
+- Hint 1:
+  Shendefraude? Bullocks I say! You're way off the Markov.
+
+** Files
+- [[file:challenge/server.py][server.py]]
+- [[file:challenge/requirements.txt][requirements.txt]]
+
+* Solution
+** Code
+#+begin_src python :tangle healthcheck/solve.py :results none
+#!/usr/bin/env python3
+
+import numpy as np
+from base64 import b64encode
+from qiskit import *
+from qiskit.circuit.library import StatePreparation
+from qiskit.compiler import transpile
+import qiskit.quantum_info as qi
+
+WIRES = 5
+
+# helper functions from challenge
+def normalization(msg):
+    assert(len(msg) <= WIRES**2)
+    state = np.array([ord(c) for c in msg.ljust(2**WIRES, ' ')])
+    norm = np.linalg.norm(state)
+    state = state / norm
+    return (state, norm)
+
+def transform(sv, n):
+    legal = lambda c: ord(' ') <= c and c <= ord('~')
+    renormalized = [float(i.real)*n for i in sv]
+    rn_rounded = [round(i) for i in renormalized]
+    if not np.allclose(renormalized, rn_rounded, rtol=0, atol=1e-2):
+        print("Your rehydrated statevector isn't very precise. Try adding at least 6 decimal places of precision, or contact the challenge author if you think this is a mistake.")
+        print(rn_rounded)
+        exit(0)
+    if np.any([not legal(c) for c in rn_rounded]):
+        print("Invalid ASCII characters.")
+        exit(0)
+    return ''.join([chr(n) for n in rn_rounded])
+
+
+def solve_qiskit():
+    echo_sv, _ = normalization("echo 'Hello, world!'")
+    cat_sv, cat_n = normalization("cat /flag.txt")
+
+    circ = QuantumCircuit(WIRES)
+    circ.append(StatePreparation(cat_sv, label="sp"), range(WIRES))
+    circ.append(StatePreparation(echo_sv, label="inv_sp", inverse=True), range(WIRES))
+
+    # append the original StatePreparation to confirm that this works; remove for payload
+    #circ.append(StatePreparation(echo_sv), range(WIRES))
+    circ = transpile(circ, backend=Aer.get_backend("aer_simulator"), optimization_level=3)
+    sv = qi.Statevector.from_instruction(circ)
+
+    return b64encode(circ.qasm().encode()), cat_n
+
+if __name__ == "__main__":
+    print(solve_qiskit())
+#+end_src
+
+** Explanation
+We connect to the challenge server and are greeted with the following:
+#+begin_src python :session main :results output :exports both
+print("Welcome to the Quantum Secure Shell. Instead of dealing with pesky encryption, just embed your commands into our quantum computer! I batched the next command in with yours, hope you're ok with that!")
+
+given_sv, given_n = normalization("echo 'Hello, world!'")
+print_given(given_sv, given_n)
+print("\nPlease type your OpenQASM circuit as a base64 encoded string: ")
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Welcome to the Quantum Secure Shell. Instead of dealing with pesky encryption, just embed your commands into our quantum computer! I batched the next command in with yours, hope you're ok with that!
+     ┌─────────────────┐┌───────────────────────┐
+q_0: ┤0                ├┤0                      ├
+     │                 ││                       │
+q_1: ┤1                ├┤1                      ├
+     │                 ││                       │
+q_2: ┤2 Your Circ Here ├┤2 echo 'Hello, world!' ├
+     │                 ││                       │
+q_3: ┤3                ├┤3                      ├
+     │                 ││                       │
+q_4: ┤4                ├┤4                      ├
+     └─────────────────┘└───────────────────────┘
+Normalization constant: 419.1873089681986
+
+Executing...
+
+Hello, world!
+
+Please type your OpenQASM circuit as a base64 encoded string:
+#+end_example
+
+Taking a look at the source, we see that we input some quantum circuit which is inserted before a different circuit, and the resultant statevector is then "unnormalized", interpreted as a string, and fed to ~os.system~.
+
+Our end goal should be to embed a string like ~ls~ or ~cat flag.txt~; this is trivial with the ~normalization~ function provided.
+#+begin_src python :session main :results none
+cat_sv, cat_n = normalization("cat /flag.txt")
+cat_circ = StatePreparation(cat_sv, label="state_prep")
+#+end_src
+
+*** What is the normalization constant?
+The "measurement rule" in quantum mechanics dictates that the sum of all amplitudes squared must equal 1. In order to encode a vector of ASCII values in the circut, we first need to normalize it; to get back to the original vector, we "undo" the normalization by multiplying the scalar normalization constant.
+
+Good news is, we didn't receive any mod mail on the normalization constant so... hopefully no one had any issues?
+
+*** Where's the measurement?
+You might be wondering how one might fit a 32 character string into 5 qubits, and more importantly; where are the measurement gates?
+The output of the circuit is the *statevector*, which means if you were to measure the qubits instead, the probability of measuring a specific outcome would correspond to amplitudes in the statevector. Using the statevector, we're able to losslessly finangle lots of data into the rotation of a qubit that would otherwise be lost through measurement.
+
+*** About ~StatePreparation~
+The existing circuit embeddeds the string ~echo 'Hello, world!'~ using Qiskit's ~StatePreparation~ function. This is a form of *amplitude encoding*, a way to encode information in the probability amplitudes of discrete quantum states.
+A common point of confusion was that ~StatePreparation~ returns a statevector; it's actually an algorithm for creating a _circuit_ that will transform $\ket{0}$ into a desired statevector.
+#+begin_src python :session main :results output :exports both
+circ = StatePreparation(given_sv)
+print(qi.Statevector.from_instruction(circ) == qi.Statevector(given_sv))
+#+end_src
+
+#+RESULTS:
+: True
+
+*** Hope you didn't sleep through linalg (I did)
+The next part is to figure out how to "get rid of" the circuit applied after your input, which encodes the string ~echo 'Hello, world!'~. Quantum circuits are all really just unitary matrices, which means they're invertible.
+
+So if we have input $I$, ~echo~ input $E$, and desired payload $P$ in $IE = P$, that means $I = (PE^{\dagger})$.
+
+In order to calculate $E^{\dagger}$, we need to grab $E$:
+#+begin_src python :session main :results none
+echo_sv, _ = normalization("echo 'Hello, world!'")
+E = StatePreparation(echo_sv, label="echo")
+#+end_src
+
+And then take its inverse:
+#+begin_src python :session main :results none
+E_inv = E.inverse()
+#+end_src
+
+Finally, we compose the individual circuits together:
+#+begin_src python :session main :results file graphics :file circuit.png :exports both
+circ = QuantumCircuit(WIRES)
+circ.append(cat_circ, range(WIRES))
+circ.append(E_inv, range(WIRES))
+
+circ.draw('mpl', filename="circuit.png")
+#+end_src
+
+#+RESULTS:
+[[file:circuit.png]]
+
+Gross (and also kinda wrong). Qiskit's QASM converter will happily spit out black boxes like above, assuming whoever will consume the QASM will know what that means.
+
+*** An aside on OpenQASM
+If we try to convert our circuit as is to QASM, we run into some issues:
+#+begin_src python :session main :exports results
+bad_qasm = circ.qasm()
+'\n'.join(bad_qasm.split('\n')[:10])
+#+end_src
+
+#+RESULTS:
+#+begin_example
+OPENQASM 2.0;
+include "qelib1.inc";
+gate multiplex1_reverse q0 { ry(-0.9473261592929516) q0; }
+gate multiplex1_reverse q0 { ry(-1.3397858201302646) q0; }
+gate multiplex1_reverse_reverse q0 { ry(-0.3536118177018793) q0; }
+gate multiplex2_reverse q0,q1 { cx q1,q0; multiplex1_reverse_reverse q0; cx q1,q0; multiplex1_reverse q0; }
+gate multiplex1_reverse q0 { ry(-1.2759405183720096) q0; }
+gate multiplex1_reverse_reverse q0 { ry(0.31353804009633557) q0; }
+gate multiplex2_reverse q0,q1 { multiplex1_reverse_reverse q0; cx q1,q0; multiplex1_reverse q0; }
+gate multiplex1_reverse_reverse_reverse q0 { ry(-0.08209531628326117) q0; }
+#+end_example
+
+In order to emit QASM that Qiskit will actually understand, we need to transpile our circuit to a set of universal basis gates. This is also how quantum circuits are run on hardware, as each computer only understands a certain set of basis gates.
+#+begin_src python :session main :exports both
+from qiskit import transpile, Aer
+circ_transpiled = transpile(circ, backend=Aer.get_backend("aer_simulator"), optimization_level=3)
+good_qasm = circ_transpiled.qasm()
+'\n'.join(good_qasm.split('\n')[:10])
+#+end_src
+
+#+RESULTS:
+#+begin_example
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[5];
+ry(1.4344105714005224) q[0];
+ry(1.5262619493655363) q[1];
+ry(1.4620958103644104) q[2];
+ry(1.529511531152613) q[3];
+ry(0.6960408807071359) q[4];
+cx q[4],q[3];
+ry(-0.04128479564228349) q[3];
+#+end_example
+
+A little tangent on OpenQASM: the implementation is /so/ scuffed and incomplete to the point it makes Yandere Simulator look like enterprise software. I had poked around trying to develop a challenge focused on OpenQASM, but found that literally every interesting part of the spec was unimplemented 😢
+
+Here's Qiskit's implementation of OpenQASM3's ~include~ statement:
+#+begin_src python :noeval
+def visit_Include(self, node: ast.Include, context: State) -> State:
+		if node.filename != "stdgates.inc":
+				raise_from_node(node, "non-stdgates imports not currently supported")
+		for name, (builder, n_arguments, n_qubits) in _STDGATES.items():
+				context = self._define_gate(name, builder, n_arguments, n_qubits, node, context)
+		return context
+#+end_src
+I understand that this is alpha software for a rather small part of Qiskit, and I'm not trying to pile on the Qiskit devs for not lavishing more attention on this, but... bruh.
+
+*** Finishing up
+All that's left is to ~b64encode~ this bad boy and ship it off to remote.
+#+begin_src python :session main :results value :exports both
+payload = b64encode(good_qasm.encode())
+# server side
+transform(qi.Statevector.from_instruction(make_circ(given_sv, QuantumCircuit.from_qasm_str(b64decode(payload).decode()))), cat_n)
+#+end_src
+
+#+RESULTS:
+: cat /flag.txt                   
+
+*** Retrospection
+When the challenge was first released (on the second day of the CTF), I decided to not release the source. Although that was intended to prevent code reuse from ~server.py~, it made the challenge waaaay too guessy. Not only that, but it was probably better to provide primitives so you could focus on solving the challenge instead of placating Qiskit's fussiness.
+
+This very much locks you into using Qiskit and — according to some modmail I received — a particular way of solving the challenge. Even though the server was built against the latest version of Qiskit (and thus the version people would get from ~pip install -r requirements.txt~), in the future I would release the server Dockerfile to remove any source of impurity. (This is somewhat ironic, given that the challenge author uses NixOS.)

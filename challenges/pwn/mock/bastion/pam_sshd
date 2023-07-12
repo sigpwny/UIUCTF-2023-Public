@@ -1,0 +1,4 @@
+account sufficient pam_permit.so
+auth sufficient pam_permit.so
+password sufficient pam_permit.so
+session sufficient pam_permit.so

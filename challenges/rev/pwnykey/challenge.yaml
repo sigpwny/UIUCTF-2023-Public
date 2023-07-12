@@ -1,0 +1,47 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: pwnykey
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: false
+    ports:
+      - protocol: "TCP"
+        targetPort: 80
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/pwnykey-healthcheck:b560febe492f0d0f54af9ff5fd0a9377f4b125816f03850c75da0dba2eeb6591
+  image: us.gcr.io/dotted-forest-314903/pwnykey-challenge:e055c1bc4b3fa0e930eeed7c687e195c8d19b03467c58a801301117b6e2887a9
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: pwnykey
+  labels:
+    app: pwnykey
+spec:
+  entryPoints:
+    - https
+  routes:
+    - match: Host(`pwnykey-web.chal.uiuc.tf`)
+      kind: Rule
+      services:
+        - name: pwnykey
+          port: 80
+  tls:
+    secretName: tls-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pwnykey-cname
+  labels:
+    app: pwnykey
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: pwnykey-web.chal.uiuc.tf
+spec:
+  externalName: traefik.chal.uiuc.tf
+  type: ExternalName

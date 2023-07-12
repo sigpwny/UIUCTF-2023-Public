@@ -1,0 +1,104 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: INSTANCE_NAME
+  namespace: mock-managed
+  labels:
+    name: INSTANCE_NAME
+spec:
+  # Sync with nsjail time_limit
+  activeDeadlineSeconds: 1200
+  backoffLimit: 0
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/volumes: "true"
+      labels:
+        app: mock
+        name: INSTANCE_NAME
+        # Needed for gcsfuse
+        uiuctf-egress: all
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: challenge
+          image: us.gcr.io/dotted-forest-314903/mock-challenge:30fdd05468beb465026c6330872b8a718b3bc400d7889352749fae57b938e132
+          ports:
+            - containerPort: 2223
+            - containerPort: 5903
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1.5Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            privileged: true
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: kvm-host
+              mountPath: /dev/kvm
+            - name: gcs-chal-files
+              mountPath: /mnt
+              readOnly: true
+        - name: novnc
+          image: us.gcr.io/dotted-forest-314903/mock-novnc:2d261aff89b7b62a8516339dbd8672fe8b0fe39dcf8e5c383c97fa7fad263ada
+          ports:
+            - containerPort: 8080
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+        # For some reason connecting to hostfwd with non-localhost doesn't
+        # get response
+        - name: sshsocat
+          image: us.gcr.io/dotted-forest-314903/mock-sshsocat:02038ebe6348089b92ba4bbf8aebee8e5defaae602d1691fd21f5a8fc277f3b1
+          ports:
+            - containerPort: 2222
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: kvm-host
+          hostPath:
+            path: /dev/kvm
+            type: CharDevice
+        - name: gcs-chal-files
+          persistentVolumeClaim:
+            claimName: chal-files-mock-pvc
+      serviceAccountName: gcs-chal-files-sa
+      nodeSelector:
+        dedicated: kvm
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: kvm
+          effect: NoExecute
+      restartPolicy: Never
+  ttlSecondsAfterFinished: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: INSTANCE_NAME
+  namespace: mock-managed
+  labels:
+    name: INSTANCE_NAME
+  ownerReferences: null
+spec:
+  selector:
+    app: mock
+    name: INSTANCE_NAME
+  ports:
+    - name: novnc
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+    - name: ssh
+      protocol: TCP
+      port: 22
+      targetPort: 2222
+  type: ClusterIP

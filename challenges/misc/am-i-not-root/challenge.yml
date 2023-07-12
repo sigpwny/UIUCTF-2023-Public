@@ -1,0 +1,26 @@
+name: "Am I not root?"
+author: "YiFei Zhu"
+category: misc
+description: |-
+  Ever wondered why nsjail prints a giant warning when it's run as root?
+  Well, now you know ;)
+
+  `$ socat file:$(tty),raw,echo=0 tcp:am-i-not-root.chal.uiuc.tf:1337`
+
+  Handout: Same as `Zapping a Setuid 1`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{need_more_isolations_for_root_5a4bb464}
+hints:
+  - I disabled coredumps and modules. What else are there?
+tags:
+  - systems
+state: visible
+version: "0.1"
